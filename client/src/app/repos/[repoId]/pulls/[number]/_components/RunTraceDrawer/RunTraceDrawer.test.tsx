@@ -3,8 +3,10 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunTrace } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/runs.json"; // apps/web/messages/en/runs.json
+import common from "../../../../../../../../messages/en/common.json";
 
 // Mock the trace hooks so the drawer renders without a query client / SSE.
+// Stored before the run-cost feature: stats has NO cost_usd key.
 const TRACE: RunTrace = {
   config: { agent: "Security", version: "1", provider: "openai", model: "gpt-4.1", pr: 482, source: "local" },
   stats: { duration_ms: 8200, tokens_in: 12000, tokens_out: 1500, findings: 2, grounding: "2/2 passed" },
@@ -19,8 +21,9 @@ const TRACE: RunTrace = {
   ],
 };
 
+let currentTrace: RunTrace = TRACE;
 vi.mock("../../../../../../../lib/hooks/trace", () => ({
-  useRunTrace: () => ({ data: TRACE, isLoading: false }),
+  useRunTrace: () => ({ data: currentTrace, isLoading: false }),
 }));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useRunEvents: () => ({ events: [], running: false }),
@@ -28,11 +31,14 @@ vi.mock("../../../../../../../lib/hooks/reviews", () => ({
 
 import RunTraceDrawer from "./RunTraceDrawer";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  currentTrace = TRACE;
+});
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ runs: messages }}>
+    <NextIntlClientProvider locale="en" messages={{ runs: messages, common }}>
       <div data-theme="dark">{ui}</div>
     </NextIntlClientProvider>,
   );
@@ -52,5 +58,22 @@ describe("A5 Run Trace drawer (smoke)", () => {
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+});
+
+describe("Run Trace drawer — COST stat", () => {
+  it("shows the run cost between TOKENS and FINDINGS, exact USD in the tooltip", () => {
+    currentTrace = { ...TRACE, stats: { ...TRACE.stats, cost_usd: 0.0123456 } };
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    const labels = screen.getAllByText(/^(DURATION|TOKENS|COST|FINDINGS)$/).map((el) => el.textContent);
+    expect(labels).toEqual(["DURATION", "TOKENS", "COST", "FINDINGS"]);
+    const badge = screen.getByTestId("run-cost");
+    expect(badge).toHaveTextContent("$0.0123");
+    expect(badge).toHaveAttribute("title", "$0.0123456");
+  });
+
+  it("a trace stored before the feature (no cost_usd) shows '—'", () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    expect(screen.getByTestId("run-cost")).toHaveTextContent("—");
   });
 });

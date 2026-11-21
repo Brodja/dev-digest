@@ -167,6 +167,24 @@ describe('AI contracts parse fixtures', () => {
     });
     expect(trace.tool_calls).toHaveLength(1);
   });
+
+  it('RunTrace.stats.cost_usd is optional: traces stored before run-cost still parse', () => {
+    const base = {
+      config: { agent: 'Security Reviewer', model: 'claude-haiku-5-5' },
+      prompt_assembly: { system: 's', user: 'u' },
+      tool_calls: [],
+      raw_output: '{}',
+      memory_pulled: [],
+      specs_read: [],
+      log: [],
+    };
+    const stats = { duration_ms: 8200, tokens_in: 8200, tokens_out: 919, findings: 3, grounding: '3/3 passed' };
+    // Old jsonb document — no cost_usd key at all (run_traces are never migrated).
+    expect(RunTrace.parse({ ...base, stats }).stats.cost_usd).toBeUndefined();
+    // Failed run / model without a price.
+    expect(RunTrace.parse({ ...base, stats: { ...stats, cost_usd: null } }).stats.cost_usd).toBeNull();
+    expect(RunTrace.parse({ ...base, stats: { ...stats, cost_usd: 0.0012795 } }).stats.cost_usd).toBe(0.0012795);
+  });
 });
 
 describe('platform DTOs', () => {
