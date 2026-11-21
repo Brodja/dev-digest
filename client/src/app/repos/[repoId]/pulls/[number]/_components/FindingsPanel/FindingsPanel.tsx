@@ -1,15 +1,16 @@
-/* FindingsPanel — hide-low-confidence + j/k navigation + FindingCard list,
-   wiring the accept/dismiss action hook (A2). */
+/* FindingsPanel — severity counters/filter + hide-low-confidence + j/k
+   navigation + FindingCard list, wiring the accept/dismiss action hook (A2). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
+import { SeverityFilter } from "./_components/SeverityFilter";
 import { KEY_TO_ACTION } from "./constants";
-import { visibleFindings } from "./helpers";
+import { filterBySeverity, severityCounts, visibleFindings } from "./helpers";
 import { s } from "./styles";
 
 export function FindingsPanel({
@@ -26,9 +27,14 @@ export function FindingsPanel({
   const t = useTranslations("prReview");
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
+  const [severity, setSeverity] = React.useState<Severity | null>(null);
   const [focusIdx, setFocusIdx] = React.useState(0);
 
-  const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  // Counters respect Hide low confidence but not the severity filter itself,
+  // so the other levels stay visible (and clickable) while one is active.
+  const base = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  const counts = React.useMemo(() => severityCounts(base), [base]);
+  const shown = React.useMemo(() => filterBySeverity(base, severity), [base, severity]);
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
@@ -48,6 +54,14 @@ export function FindingsPanel({
   return (
     <div>
       <div style={s.toolbar}>
+        <SeverityFilter
+          counts={counts}
+          active={severity}
+          onChange={(next) => {
+            setSeverity(next);
+            setFocusIdx(0);
+          }}
+        />
         <div style={s.toggleGroup}>
           {t("panel.hideLowConfidence")}
           <Toggle on={hideLow} onChange={setHideLow} size={16} />
