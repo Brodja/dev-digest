@@ -33,7 +33,7 @@ Postgres only: `docker compose up -d` from the repo root.
 | e2e | — | `npm run e2e:hermetic` | `npm run typecheck` |
 
 - Server typecheck compiles `reviewer-core/src`, so it needs `reviewer-core/node_modules` (`npm ci` there first).
-- Before finishing, run test + typecheck for every package you changed; a `reviewer-core` change → check the server too.
+- Before finishing: run test + typecheck for every package you changed (a `reviewer-core` change → check the server too), then run `/engineering-insights`.
 
 ## Naming
 
