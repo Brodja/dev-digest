@@ -59,7 +59,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
           {t(`list.status.${st.labelKey}`)}
         </Badge>
       </div>
-      {/* Cost of the run behind the latest review (same review as the score). */}
+      {/* PR total: sum of all finished runs' costs (= the Timeline badges); score is the latest review's. */}
       <div style={s.costCell}>
         <RunCostBadge costUsd={pr.cost_usd} />
       </div>

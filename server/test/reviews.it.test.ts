@@ -6,7 +6,7 @@ import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
 import { MockLLMProvider, MockEmbedder, MockGitClient, MockGitHubClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import type { Review } from '@devdigest/shared';
 
 const hasDocker = await dockerAvailable();
@@ -291,6 +291,63 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
 
     const pulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
     expect(pulls.find((p: { id: string }) => p.id === pr.id).cost_usd).toBeNull();
+
+    await app.close();
+  });
+
+  it('run cost: the PR list shows the PR total — sum of done runs, a failed run is not counted', async () => {
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient(),
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          // Fails the Review schema → every anthropic run on this app fails.
+          anthropic: new MockLLMProvider('anthropic', { structured: { not: 'a review' } }),
+        },
+      },
+    });
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const createAgent = async (payload: Record<string, string>) =>
+      (await app.inject({ method: 'POST', url: '/agents', payload })).json();
+    const ok = await createAgent({ name: 'Total', provider: 'openai', model: 'gpt-4.1', system_prompt: 'total' });
+    const broken = await createAgent({ name: 'Total broken', provider: 'anthropic', model: 'claude-x', system_prompt: 'x' });
+
+    // Sequential: two done runs (one LLM call each, $0.001 per call) + one failed run.
+    for (const [i, agentId] of [ok.id, ok.id, broken.id].entries()) {
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId } });
+      await waitForPrRuns(pg.handle.db, pr.id, { expected: i + 1 });
+    }
+    const runs = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.prId, pr.id));
+    expect(runs.map((r) => r.status).sort()).toEqual(['done', 'done', 'failed']);
+    // The executor never prices a failed run; give it a cost anyway to prove the
+    // total filters by status, not only by NULL.
+    const failed = runs.find((r) => r.status === 'failed')!;
+    await pg.handle.db.update(t.agentRuns).set({ costUsd: 0.5 }).where(eq(t.agentRuns.id, failed.id));
+    // Score must stay the LATEST review's: make the older review's score differ.
+    const [older] = await pg.handle.db
+      .select()
+      .from(t.reviews)
+      .where(eq(t.reviews.prId, pr.id))
+      .orderBy(asc(t.reviews.createdAt));
+    await pg.handle.db.update(t.reviews).set({ score: 10 }).where(eq(t.reviews.id, older!.id));
+
+    const pulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    const listed = pulls.find((p: { id: string }) => p.id === pr.id);
+    expect(listed.cost_usd).toBeCloseTo(0.002, 10);
+    expect(listed.score).toBe(65); // latest review: grounding keeps one CRITICAL ⇒ 100 − 35
+
+    // Same number as the Timeline's badges (done runs of GET /pulls/:id/runs) summed.
+    const timeline: { status: string; cost_usd: number | null }[] = (
+      await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })
+    ).json();
+    const timelineTotal = timeline
+      .filter((r) => r.status === 'done')
+      .reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
+    expect(listed.cost_usd).toBeCloseTo(timelineTotal, 10);
 
     await app.close();
   });
