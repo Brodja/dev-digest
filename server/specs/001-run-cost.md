@@ -34,7 +34,7 @@ A model without a price → `null`. If any chunk of a map-reduce run returns `nu
 |---|---|---|
 | `GET /pulls/:id/runs` | `RunSummary.cost_usd` | `agent_runs.cost_usd` |
 | `GET /runs/:id/trace` | `RunTrace.stats.cost_usd` (nullish — old trace documents lack it) | same number, stored in the trace document |
-| `GET /repos/:id/pulls` | `PrMeta.cost_usd` (nullish, list endpoint only) | cost of the run that produced the PR's **latest review** — the same review whose score is in the ring; not a sum over "Review all", not a PR total |
+| `GET /repos/:id/pulls` | `PrMeta.cost_usd` (nullish, list endpoint only) | **PR total**: `SUM(agent_runs.cost_usd)` over the PR's runs with `status = 'done'` and `cost_usd IS NOT NULL`; `null` when there is no such run. Equals the sum of the cost badges in the Agent runs Timeline. The score ring next to it stays the **latest review's** score |
 
 The run's Live log gets one line on success: `Cost: $<full precision> (<in>→<out> tokens)`,
 or `Cost: unknown (no price for <model>)`.
@@ -56,20 +56,34 @@ The full, unrounded number is in the badge tooltip (`title`) so it can be compar
 - `compact` → `$0.014` — PR list, Review run header, trace sidebar.
 - `detailed` → `9,119 tok · $0.0814` — Timeline row (tokens = in + out).
 - No data → `—`. Never a fake price for an unfinished run: the Timeline renders no badge for a run that is
-  not `done`; the PR list and the Review runs header only reference finished runs (a review exists only for
-  a `done` run); the trace sidebar keeps its `COST` tile and shows `—` for failed / cancelled runs.
+  not `done`; the PR list sums only `done` runs and the Review runs header only references finished runs (a
+  review exists only for a `done` run); the trace sidebar keeps its `COST` tile and shows `—` for failed /
+  cancelled runs.
 
 ### Screens
 
-1. **Pull Requests** — new `COST` column between `STATUS` and `UPDATED`; `—` when the PR has no review or the cost is unknown.
+1. **Pull Requests** — new `COST` column between `STATUS` and `UPDATED`: the PR total (sum of all finished runs);
+   `—` when the PR has no finished run with a known cost.
 2. **PR → Agent runs** — Timeline: a second line under the launch time (`detailed`); Review runs: `compact` badge before the date in the accordion header.
 3. **Agent run sidebar (Trace → Stats)** — a fourth tile `COST` between `TOKENS` and `FINDINGS`.
+
+## Decisions
+
+- **PR list cost = sum over the PR, not the latest run** (2026-11-22, review feedback). The first version showed the
+  cost of the run behind the latest review, so after re-runs or "Run all enabled agents" the column disagreed with
+  the Timeline. Now it is the sum of every `done` run with a known cost — the same runs whose badges the Timeline
+  shows — so the column answers "what did reviewing this PR cost". The score stays the latest review's: a score
+  is a state, cost is spend.
+  - Runs with an unknown price (`cost_usd NULL`) are skipped, not treated as `0`; if none has a price → `null` (`—`).
+    With a mix, the total covers only the priced runs.
+  - Failed / cancelled runs are excluded by status (and never carry a cost anyway).
+  - Deleting a run from the Timeline removes it from the total too (computed on read, no denormalised column).
 
 ## Out of scope
 
 - The cost line in the Overview verdict banner (the Overview tab has no PR brief / verdict yet).
 - Cost of partially executed (failed / cancelled) runs — the engine returns no partial usage on error.
-- Aggregates (per PR, per agent, Agent Performance).
+- Aggregates beyond the per-PR total on the list (per agent, per repo, Agent Performance).
 - Reconciliation with a provider dashboard.
 
 ## Done when
@@ -78,5 +92,7 @@ The full, unrounded number is in the badge tooltip (`title`) so it can be compar
 - A run without data shows `—`, never `$0.00`; an unfinished run shows no price.
 - The number in the badge tooltip equals the `Cost:` line in the same run's Live log.
 - No new LLM calls.
-- Tests: server integration (cost persisted and returned by the three routes; failed run → `null`),
+- The PR list cost equals the sum of the Timeline badges of the same PR.
+- Tests: server integration (cost persisted and returned by the three routes; failed run → `null`; two `done`
+  runs on one PR → the list shows their sum, a failed run is not counted),
   contract back-compat (trace without `stats.cost_usd` parses), client unit tests for the format table and the three screens.

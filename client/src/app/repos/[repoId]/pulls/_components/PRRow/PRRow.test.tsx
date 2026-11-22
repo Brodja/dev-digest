@@ -48,7 +48,7 @@ function renderRow(p: PrMeta) {
 }
 
 describe("PRRow — COST column", () => {
-  it("a reviewed PR shows the latest review's run cost", () => {
+  it("a reviewed PR shows the PR's total run cost", () => {
     renderRow(pr({ score: 61, cost_usd: 0.014 }));
     const badge = screen.getByTestId("run-cost");
     expect(badge).toHaveTextContent(/^\$0\.014$/);
@@ -61,7 +61,7 @@ describe("PRRow — COST column", () => {
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
   });
 
-  it("a reviewed PR whose run has no price shows '—'", () => {
+  it("a reviewed PR whose runs have no price shows '—'", () => {
     renderRow(pr({ score: 72, cost_usd: undefined }));
     expect(screen.getByTestId("run-cost")).toHaveTextContent("—");
   });
