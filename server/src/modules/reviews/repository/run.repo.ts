@@ -62,7 +62,7 @@ export async function listRunsForPull(
     cost_usd: run.costUsd,
     findings_count: run.findingsCount,
     grounding: run.grounding,
-    ran_at: run.ranAt ? run.ranAt.toISOString() : null,
+    started_at: run.ranAt ? run.ranAt.toISOString() : null,
     score: run.score,
     blockers: run.blockers,
   }));
