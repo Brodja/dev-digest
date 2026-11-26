@@ -1,6 +1,6 @@
 import type { Skill } from "@devdigest/shared";
 import type { SkillInput } from "@/lib/hooks/skills";
-import { EMPTY_SKILL, type SkillFormValues } from "../SkillForm";
+import { EMPTY_SKILL, type SkillFormValues } from "@/components/SkillForm";
 
 /** Form values for a skill being edited, or the empty form for a new one. */
 export function initialValues(skill?: Skill): SkillFormValues {

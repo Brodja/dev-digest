@@ -10,7 +10,7 @@ import type { Skill } from "@devdigest/shared";
 import { ApiError } from "@/lib/api";
 import { useCreateSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { SkillForm, validateSkill, type SkillFormValues } from "../SkillForm";
+import { SkillForm, validateSkill, type SkillFormValues } from "@/components/SkillForm";
 import { changedFields, initialValues } from "./helpers";
 import { s } from "./styles";
 

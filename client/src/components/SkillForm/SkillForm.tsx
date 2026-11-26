@@ -1,13 +1,15 @@
 /* SkillForm — the controlled skill fields: name, description (with the
    "write it as a directive" hint), type, enabled and the markdown body with a
-   token estimate. Used by the create/edit modal (and the import preview). */
+   token estimate. Shared by /skills (create/edit modal, import preview) and the
+   Conventions page's "Accept as Skill" modal (type locked to convention). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { FormField, SelectInput, TextInput, Textarea, Toggle } from "@devdigest/ui";
 import type { SkillType } from "@devdigest/shared";
-import { SKILL_TYPES } from "../../constants";
+import { SkillTypeBadge } from "@/components/SkillTypeBadge";
+import { SKILL_TYPES } from "@/lib/skill-fields";
 import { estimateTokens, validateSkill, type SkillField, type SkillFormValues } from "./helpers";
 import { s } from "./styles";
 
@@ -17,6 +19,7 @@ export function SkillForm({
   showRequired,
   nameTaken,
   hideEnabled,
+  lockedType,
 }: {
   values: SkillFormValues;
   onChange: (patch: Partial<SkillFormValues>) => void;
@@ -26,6 +29,8 @@ export function SkillForm({
   nameTaken?: boolean;
   /** Import: the skill is always saved disabled, so the switch is not offered. */
   hideEnabled?: boolean;
+  /** The caller decides the type (conventions → convention): shown read-only. */
+  lockedType?: SkillType;
 }) {
   const t = useTranslations("skills");
   const issues = validateSkill(values);
@@ -75,11 +80,17 @@ export function SkillForm({
       <div style={s.row}>
         <div style={s.typeCol}>
           <FormField label={t("editor.type")}>
-            <SelectInput
-              value={values.type}
-              onChange={(type) => onChange({ type: type as SkillType })}
-              options={[...SKILL_TYPES]}
-            />
+            {lockedType ? (
+              <div style={s.lockedType} data-testid="skill-type-locked">
+                <SkillTypeBadge type={lockedType} />
+              </div>
+            ) : (
+              <SelectInput
+                value={values.type}
+                onChange={(type) => onChange({ type: type as SkillType })}
+                options={[...SKILL_TYPES]}
+              />
+            )}
           </FormField>
         </div>
         {!hideEnabled && (

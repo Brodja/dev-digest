@@ -55,7 +55,11 @@ export class ConventionsRepository {
     return row;
   }
 
-  /** Candidates with evidence: pending, then accepted, then rejected; by confidence. */
+  /**
+   * Candidates with evidence: pending, then accepted, then rejected; by confidence.
+   * Rows of one scan share created_at and often confidence (a model may answer 1.0
+   * for all), so rule + id break ties — otherwise cards reorder on every refetch.
+   */
   async list(workspaceId: string, repoId: string): Promise<ConventionRow[]> {
     return this.db
       .select()
@@ -73,6 +77,8 @@ export class ConventionsRepository {
         asc(t.conventions.accepted),
         desc(t.conventions.confidence),
         asc(t.conventions.createdAt),
+        asc(t.conventions.rule),
+        asc(t.conventions.id),
       );
   }
 

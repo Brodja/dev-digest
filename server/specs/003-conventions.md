@@ -113,7 +113,7 @@ answer `85` or `1.2`, and a failed parse costs a repair request). Code clamps `c
 
 | Route | Body | Response |
 |---|---|---|
-| `GET /repos/:id/conventions` | — | `ConventionsState`: the latest scan (or `null`) and every candidate of the repo, sorted pending → accepted → rejected, then confidence desc |
+| `GET /repos/:id/conventions` | — | `ConventionsState`: the latest scan (or `null`) and every candidate of the repo, sorted pending → accepted → rejected, then confidence desc, then rule (a stable order: one scan's rows share `created_at` and often confidence) |
 | `POST /repos/:id/conventions/extract` | — | `ConventionsState` after the scan. Synchronous: one model call. Route rate limit 5 / minute (precedent `src/modules/reviews/routes.ts:29`) |
 | `PATCH /repos/:id/conventions/:conventionId` | `{ status?: ConventionStatus, rule?: string }` — at least one field (`.refine`); `rule` trimmed, 1–500 chars | `ConventionCandidate` |
 | `POST /repos/:id/conventions/skill` | `{ name, description, body, convention_ids: uuid[] }` (1–100, unique); `name` / `description` / `body` follow the skill rules of 002 | 201 `Skill` with `type = convention`, `source = extracted`, `enabled = true`, `version = 1` |
@@ -288,11 +288,12 @@ Placement follows `frontend-architecture`; strings go through next-intl.
   - Actions: **Re-scan** (`Run extraction` before the first scan; "Scanning…" and disabled while running) and
     **Accept as Skill** (`card.acceptAsSkill`; disabled until something is accepted) → opens the modal.
   - States: loading skeleton; load error → `ErrorState` with retry (`page.loadError`); no scan yet → `EmptyState` with
-    *Run extraction*; latest scan failed → an alert banner `extractionFailed` + the stored message, with a text per known
-    code (`repo_not_indexed`, `repo_intel_disabled`, `repo_not_cloned`, `repo_changed`); a succeeded scan with no
-    candidates → a "nothing grounded" note.
-  - Candidates grouped: pending, accepted, rejected.
-  - `helpers.ts`: `composeSkillDraft(repo, conventions, takenNames)`, `groupByStatus`, scan summary.
+    *Run extraction*; latest scan failed (or this session's request failed) → an alert banner `extractionFailed` with
+    the page's own text for `repo_not_indexed`, `repo_intel_disabled`, `repo_not_cloned`, `repo_changed`,
+    `extraction_running`, `llm_bad_output`, and the server's message for any other code (`llm_failed`,
+    `config_error`, …); a succeeded scan with no candidates → a "nothing grounded" note.
+  - Candidates grouped: pending, accepted, rejected (sections with counts).
+  - `helpers.ts`: `groupByStatus`, `isKnownScanError`. The scan summary uses next-intl `useFormatter().relativeTime`.
 - `_components/ConventionCard/` (one candidate):
   - rule (italic), **Edit** → inline textarea with Save / Cancel (`PATCH { rule }`; blank is blocked);
   - evidence header: `MonoLink` `path:Lstart-Lend` → `githubBlobUrl(full_name, commit_sha ?? default_branch, path,
@@ -305,7 +306,8 @@ Placement follows `frontend-architecture`; strings go through next-intl.
 - `_components/CreateConventionSkillModal/`: `Modal` width 760, title "Create skill from conventions", subtitle = name; a
   banner "Merged from N accepted conventions in `<repo>`. Everything below is editable before you save."; `SkillForm`
   with `lockedType="convention"` and `hideEnabled`; footer Cancel / Create skill; 409 → `nameTaken` inline, other errors
-  inline; success → toast with the skill name, modal closes.
+  inline; success → toast with the skill name, modal closes. Its `helpers.ts` holds `composeSkillDraft(repo,
+  conventions, takenNames)` and `freeSkillName`; `ConventionCard/helpers.ts` holds `lineRef` (`L12` / `L12-L14`).
 
 ### Shared pieces
 
@@ -467,7 +469,8 @@ Tests (Vitest + RTL; `vi.mock` for `@/lib/hooks/conventions`, `@/lib/repo-contex
   `{ rule }`, blank blocked, Cancel restores; a `<img onerror>` snippet renders as text; badges and Undo.
 - `CreateConventionSkillModal.test.tsx` — prefilled fields, type read-only; payload has `convention_ids`; 409 inline;
   blank body blocked; success → toast and close; Cancel sends nothing.
-- `ConventionsView/helpers.test.ts` — the draft has only accepted rules, in order, with references, without snippets;
+- `CreateConventionSkillModal/helpers.test.ts` — the draft has only the given (accepted) rules, in order, with
+  references, without snippets; `ConventionsView/helpers.test.ts` — grouping by status, known error codes;
   free name when `repo-conventions` is taken.
 - Moved `SkillForm.test.tsx` (+ `lockedType`); the `/skills` tests stay green.
 

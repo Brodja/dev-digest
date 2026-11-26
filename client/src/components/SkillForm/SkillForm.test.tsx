@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import React from "react";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import skills from "../../../../../messages/en/skills.json";
+import skills from "../../../messages/en/skills.json";
 import { SkillForm } from "./SkillForm";
 import { EMPTY_SKILL, estimateTokens, validateSkill, type SkillFormValues } from "./helpers";
 
@@ -69,6 +69,17 @@ describe("SkillForm", () => {
     fireEvent.click(sw);
     expect(sw).toHaveAttribute("aria-checked", "false");
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("shows a locked type read-only instead of the select (conventions → convention)", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={{ skills }}>
+        <SkillForm values={{ ...EMPTY_SKILL, type: "convention" }} onChange={vi.fn()} lockedType="convention" hideEnabled />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByTestId("skill-type-locked")).toHaveTextContent("convention");
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 });
 

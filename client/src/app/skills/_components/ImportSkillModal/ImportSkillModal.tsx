@@ -12,7 +12,7 @@ import { ApiError } from "@/lib/api";
 import { useImportSkill, useImportSkillPreview } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
 import { IMPORT_ACCEPT, IMPORT_MAX_FILE_BYTES } from "../../constants";
-import { SkillForm, EMPTY_SKILL, validateSkill, type SkillFormValues } from "../SkillForm";
+import { SkillForm, EMPTY_SKILL, validateSkill, type SkillFormValues } from "@/components/SkillForm";
 import { importFailureOf, readFileAsBase64 } from "./helpers";
 import { s } from "./styles";
 

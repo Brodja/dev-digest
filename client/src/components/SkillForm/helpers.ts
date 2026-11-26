@@ -1,5 +1,5 @@
 import type { SkillType } from "@devdigest/shared";
-import { SKILL_BODY_MAX, SKILL_DESCRIPTION_MAX, SKILL_NAME_PATTERN } from "../../constants";
+import { SKILL_BODY_MAX, SKILL_DESCRIPTION_MAX, SKILL_NAME_PATTERN } from "@/lib/skill-fields";
 
 export interface SkillFormValues {
   name: string;
