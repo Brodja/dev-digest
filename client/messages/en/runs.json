@@ -31,6 +31,8 @@
     "config": {
       "model": "Model",
       "provider": "Provider",
+      "skillsLoaded": "Skills loaded",
+      "skillVersion": "v{version}",
       "memoryPulled": "Memory pulled",
       "specsRead": "Specs read",
       "items": "{count, plural, one {# item} other {# items}}",
