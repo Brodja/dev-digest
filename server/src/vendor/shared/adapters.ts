@@ -94,6 +94,16 @@ export interface Embedder {
   readonly dims: number;
 }
 
+// ---------- Tokenizer ----------
+/**
+ * Prompt token counter (in-process). Used by the repo-map budget search and by
+ * the review run to attribute tokens to prompt sections (skills). Must never
+ * throw: implementations fall back to a chars/4 estimate.
+ */
+export interface Tokenizer {
+  count(text: string): number;
+}
+
 // ---------- GitHub (Octokit REST, thin) ----------
 export interface RepoRef {
   owner: string;

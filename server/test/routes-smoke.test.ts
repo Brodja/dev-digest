@@ -19,6 +19,21 @@ describe('routes (no DB)', () => {
     await app.close();
   });
 
+  it('a body over the 1 MB limit → 413 payload_too_large (not internal_error)', async () => {
+    // Body parsing fails before the handler, so no DB is touched.
+    const app = await buildApp({ config });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/skills',
+      payload: { name: 'big', description: 'd', type: 'custom', body: 'x'.repeat(1_100_000) },
+    });
+    expect(res.statusCode).toBe(413);
+    expect(res.json()).toEqual({
+      error: { code: 'payload_too_large', message: 'Request body is too large' },
+    });
+    await app.close();
+  });
+
   it('POST /settings/test-connection (github) returns structured ConnTestResult', async () => {
     const app = await buildApp({
       config,

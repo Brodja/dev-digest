@@ -24,8 +24,9 @@ const VersionParams = z.object({
  *   PUT    /agents/:id              → update / toggle enabled (versions config)
  *   GET    /agents/:id/versions     → config history (newest first)
  *   GET    /agents/:id/versions/:version → one config snapshot
- *   GET    /agents/:id/skills       → linked skills (ordered)
- *   POST   /agents/:id/skills       → set/reorder linked skills OR link one
+ *   GET    /agents/:id/skills       → linked skills (ordered, with per-agent `enabled`)
+ *   PUT    /agents/:id/skills       → replace the whole ordered set { links: [{ skill_id, enabled }] }
+ *   POST   /agents/:id/skills       → legacy: set/reorder by ids (keeps `enabled`) OR link one
  *   GET    /agents/:id/models       → dynamic model list for the agent's provider
  *   GET    /providers/:id/models    → dynamic model list for a provider (editor)
  */
@@ -66,6 +67,13 @@ const SetSkillsBody = z
   .refine((b) => b.skill_ids !== undefined || b.skill_id !== undefined, {
     message: 'Provide skill_ids (set/reorder) or skill_id (link one)',
   });
+
+/** The agent's whole skill set; array order = order of the blocks in the prompt. */
+const ReplaceSkillsBody = z.object({
+  links: z
+    .array(z.object({ skill_id: z.string().uuid(), enabled: z.boolean() }))
+    .max(200),
+});
 
 export default async function agentsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
@@ -159,6 +167,21 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
         body.skill_ids !== undefined
           ? await service.setSkills(workspaceId, req.params.id, body.skill_ids)
           : await service.linkSkill(workspaceId, req.params.id, body.skill_id!, body.order);
+      if (!links) throw new NotFoundError('Agent not found');
+      return links;
+    },
+  );
+
+  app.put(
+    '/agents/:id/skills',
+    { schema: { params: IdParams, body: ReplaceSkillsBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const links = await service.replaceSkills(
+        workspaceId,
+        req.params.id,
+        req.body.links.map((l) => ({ skillId: l.skill_id, enabled: l.enabled })),
+      );
       if (!links) throw new NotFoundError('Agent not found');
       return links;
     },

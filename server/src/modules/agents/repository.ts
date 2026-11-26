@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -6,9 +6,9 @@ import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js
 import { isConfigChange } from './helpers.js';
 
 /**
- * A2 — agents data-access. Owns `agents`, `agent_versions`, and the
- * `agent_skills` link table (shared with A1's skills repository, but A2 owns the
- * agent side: link/reorder/list for an agent). Workspace-scoped throughout.
+ * A2 — agents data-access. Owns `agents`, `agent_versions`, and the agent side
+ * of the `agent_skills` link table (link / reorder / enable / list for an agent;
+ * the skills repository only reads it for `used_by`). Workspace-scoped throughout.
  */
 
 import type { AgentRow, AgentVersionRow } from '../../db/rows.js';
@@ -42,10 +42,27 @@ export interface UpdateAgent {
   enabled?: boolean;
 }
 
-/** A skill linked to an agent (with its order), joined from agent_skills. */
+/** A skill linked to an agent (with its order + per-agent switch), joined from agent_skills. */
 export interface LinkedSkillRow {
   skill: typeof t.skills.$inferSelect;
   order: number;
+  enabled: boolean;
+}
+
+/** One entry of an agent's ordered skill set (array index = order). */
+export interface SkillLinkInput {
+  skillId: string;
+  enabled: boolean;
+}
+
+/** A skill that goes into this agent's prompt (link + skill enabled), in order. */
+export interface ActiveSkillRow {
+  id: string;
+  name: string;
+  description: string;
+  body: string;
+  source: (typeof t.skills.$inferSelect)['source'];
+  version: number;
 }
 
 export class AgentsRepository {
@@ -188,23 +205,61 @@ export class AgentsRepository {
 
   // ---- agent_skills link table (A2 owns the agent side) -------------------
 
-  /** Skills linked to an agent, in `order` ascending. */
+  /** Skills linked to an agent (enabled or not), in `order` ascending. */
   async linkedSkills(agentId: string): Promise<LinkedSkillRow[]> {
     const rows = await this.db
-      .select({ skill: t.skills, order: t.agentSkills.order })
+      .select({ skill: t.skills, order: t.agentSkills.order, enabled: t.agentSkills.enabled })
       .from(t.agentSkills)
       .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
       .where(eq(t.agentSkills.agentId, agentId))
       .orderBy(asc(t.agentSkills.order));
-    return rows.map((r) => ({ skill: r.skill, order: r.order }));
+    return rows.map((r) => ({ skill: r.skill, order: r.order, enabled: r.enabled }));
   }
 
+  /** Ids of the ENABLED links, in order — the agent version snapshot's `skills`. */
   async skillIdsForAgent(agentId: string): Promise<string[]> {
     const links = await this.linkedSkills(agentId);
-    return links.map((l) => l.skill.id);
+    return links.filter((l) => l.enabled).map((l) => l.skill.id);
   }
 
-  /** Link a skill to an agent at a given order (idempotent: upserts order). */
+  /**
+   * The skills a review run of this agent sends: link enabled AND skill enabled
+   * AND the skill in the agent's workspace, by link order.
+   */
+  async activeSkillsForAgent(agentId: string, workspaceId: string): Promise<ActiveSkillRow[]> {
+    return this.db
+      .select({
+        id: t.skills.id,
+        name: t.skills.name,
+        description: t.skills.description,
+        body: t.skills.body,
+        source: t.skills.source,
+        version: t.skills.version,
+      })
+      .from(t.agentSkills)
+      .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
+      .where(
+        and(
+          eq(t.agentSkills.agentId, agentId),
+          eq(t.agentSkills.enabled, true),
+          eq(t.skills.enabled, true),
+          eq(t.skills.workspaceId, workspaceId),
+        ),
+      )
+      .orderBy(asc(t.agentSkills.order));
+  }
+
+  /** The subset of `skillIds` that exist in this workspace. */
+  async skillIdsInWorkspace(workspaceId: string, skillIds: string[]): Promise<string[]> {
+    if (skillIds.length === 0) return [];
+    const rows = await this.db
+      .select({ id: t.skills.id })
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), inArray(t.skills.id, skillIds)));
+    return rows.map((r) => r.id);
+  }
+
+  /** Link a skill to an agent at a given order (idempotent: upserts order, keeps `enabled`). */
   async linkSkill(agentId: string, skillId: string, order: number): Promise<void> {
     await this.db
       .insert(t.agentSkills)
@@ -222,15 +277,17 @@ export class AgentsRepository {
   }
 
   /**
-   * Replace the full set of linked skills for an agent with `skillIds`, assigning
-   * order = index. Used by the "Skills" editor tab (attach/reorder). Skills not in
-   * the list are unlinked.
+   * Replace the agent's whole skill set with `links` (order = array index), in
+   * one transaction so a concurrent reader never sees a half-written set. Skills
+   * not in the list are unlinked. Used by the agent editor's Skills tab.
    */
-  async setSkills(agentId: string, skillIds: string[]): Promise<void> {
-    await this.db.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
-    if (skillIds.length === 0) return;
-    await this.db
-      .insert(t.agentSkills)
-      .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+  async replaceSkillLinks(agentId: string, links: SkillLinkInput[]): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
+      if (links.length === 0) return;
+      await tx.insert(t.agentSkills).values(
+        links.map((l, i) => ({ agentId, skillId: l.skillId, order: i, enabled: l.enabled })),
+      );
+    });
   }
 }

@@ -170,6 +170,14 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       });
       return;
     }
+    // Body over the global / route bodyLimit: a client error, not an internal
+    // one — answer 413 with its own code and don't log it as an error.
+    if ((err as { code?: string })?.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      reply.status(413).send({
+        error: { code: 'payload_too_large', message: 'Request body is too large' },
+      });
+      return;
+    }
     app.log.error(err);
     const e = err as { statusCode?: number; message?: string };
     reply.status(e.statusCode ?? 500).send({

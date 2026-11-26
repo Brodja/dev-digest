@@ -185,6 +185,33 @@ describe('AI contracts parse fixtures', () => {
     expect(RunTrace.parse({ ...base, stats: { ...stats, cost_usd: null } }).stats.cost_usd).toBeNull();
     expect(RunTrace.parse({ ...base, stats: { ...stats, cost_usd: 0.0012795 } }).stats.cost_usd).toBe(0.0012795);
   });
+
+  it('RunTrace skills fields are optional: traces stored before skills still parse', () => {
+    const base = {
+      config: { agent: 'Security Reviewer', model: 'gpt-4.1' },
+      stats: { duration_ms: 1, tokens_in: 1, tokens_out: 1, findings: 0, grounding: '0/0 passed' },
+      prompt_assembly: { system: 's', skills: null, user: 'u' },
+      tool_calls: [],
+      raw_output: '{}',
+      memory_pulled: [],
+      specs_read: [],
+      log: [],
+    };
+    const old = RunTrace.parse(base);
+    expect(old.config.skills).toBeUndefined();
+    expect(old.prompt_assembly.skills_tokens).toBeUndefined();
+
+    const withSkills = RunTrace.parse({
+      ...base,
+      config: {
+        ...base.config,
+        skills: [{ id: 's1', name: 'secret-leakage-gate', version: 2, trusted: false, tokens: 41 }],
+      },
+      prompt_assembly: { ...base.prompt_assembly, skills: '### secret-leakage-gate', skills_tokens: 43 },
+    });
+    expect(withSkills.config.skills?.[0]?.trusted).toBe(false);
+    expect(withSkills.prompt_assembly.skills_tokens).toBe(43);
+  });
 });
 
 describe('platform DTOs', () => {

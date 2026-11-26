@@ -12,10 +12,11 @@ Eight files: `index.ts` (public API), `grounding.ts`, `prompt.ts`, `review/{run,
 
 ## 2. Ports — `src/vendor/shared/**`
 
-- Shared ports in `src/vendor/shared/adapters.ts`: `LLMProvider` (`:82`), `Embedder` (`:91`), `GitHubClient` (`:143`), `GitClient` (`:205`), `CodeIndex` (`:250`), `AuthProvider` (`:268`), `SecretsProvider` (`:281`). Contracts/DTOs are in `contracts/*`.
+- Shared ports in `src/vendor/shared/adapters.ts`: `LLMProvider` (`:82`), `Embedder` (`:91`), `Tokenizer` (`:103`), `GitHubClient` (`:153`), `GitClient` (`:215`), `CodeIndex` (`:260`), `AuthProvider` (`:278`), `SecretsProvider` (`:291`). Contracts/DTOs are in `contracts/*`.
 - Name what the app needs, not the vendor: `GitHubClient`, not `Octokit`.
 - Imports only `zod` today; the gate's `ports-are-abstract` rule keeps it that way.
-- **Internal ports, not in shared:** `Tokenizer` (`src/adapters/tokenizer/index.ts:16`) and `DepGraph` (`src/adapters/depgraph/index.ts:27`) are declared next to their adapter and used only by repo-intel (`depgraph/index.ts:8`). `RepoIntel` is the facade interface (`src/modules/repo-intel/types.ts:137`). A new port that features use belongs in `adapters.ts`.
+- `Tokenizer` (`adapters.ts:103`) moved here on 2026-11-26: besides repo-intel, the review run executor counts skills tokens with it (`container.tokenizer`); `adapters/tokenizer/index.ts` implements and re-exports it.
+- **Internal port, not in shared:** `DepGraph` (`src/adapters/depgraph/index.ts:27`) is declared next to its adapter and used only by repo-intel (`depgraph/index.ts:8`). `RepoIntel` is the facade interface (`src/modules/repo-intel/types.ts:137`). A new port that features use belongs in `adapters.ts`.
 
 ## 3. Application — services
 
@@ -38,7 +39,7 @@ Eight files: `index.ts` (public API), `grounding.ts`, `prompt.ts`, `review/{run,
 | `~/.devdigest/secrets.json` | `SecretsProvider` | `adapters/secrets/local.ts` |
 | local single user | `AuthProvider` | `adapters/auth/local.ts` |
 | `@ast-grep/napi` | — (repo-intel only) | `adapters/astgrep/index.ts` |
-| `js-tiktoken` | `Tokenizer` (internal) | `adapters/tokenizer/index.ts` |
+| `js-tiktoken` | `Tokenizer` | `adapters/tokenizer/index.ts` |
 | `dependency-cruiser` | `DepGraph` (internal) | `adapters/depgraph/index.ts` |
 
 Not wrappers: `adapters/git/diff-parser.ts` is a pure parser (imports only shared types, `:1`), and `adapters/llm/pricing.ts` is a static price table.
@@ -66,7 +67,7 @@ Not wrappers: `adapters/git/diff-parser.ts` is a pure parser (imports only share
 
 1. **Port** — an interface in `src/vendor/shared/adapters.ts` named for the need, with no vendor in its shape.
 2. **Adapter** — `src/adapters/<kind>/<impl>.ts` wraps the SDK and implements the port.
-3. **Mock** — add a class to `src/adapters/mocks.ts` (it already mocks all 7 shared ports, `:58-325`).
+3. **Mock** — add a class to `src/adapters/mocks.ts` (it mocks 7 of the 8 shared ports, `:58-325`; `Tokenizer` needs none — tests pass a counter via `ContainerOverrides.tokenizer` or use the real one).
 4. **Wire** — a lazy getter in `container.ts` (async if it needs a secret), plus a field in `ContainerOverrides`.
 5. **Consume** — services call `container.<port>`; they never import the SDK or the adapter.
 6. **Gate** — add the SDK to `SDKS` in `depcruise.config.cjs`, so core and ports stay unable to import it.

@@ -104,6 +104,49 @@ describe('reviewPullRequest (engine)', () => {
     ).rejects.toThrow('cancelled');
   });
 
+  it('map-reduce: the skills block goes into every per-file call, in link order', async () => {
+    const twoFiles = [
+      'diff --git a/src/config.ts b/src/config.ts',
+      '--- a/src/config.ts',
+      '+++ b/src/config.ts',
+      '@@ -10,3 +10,4 @@',
+      '   port: 3000,',
+      '+  stripeKey: "sk_live_xxx",',
+      '   redisUrl: x,',
+      'diff --git a/src/server.ts b/src/server.ts',
+      '--- a/src/server.ts',
+      '+++ b/src/server.ts',
+      '@@ -1,2 +1,3 @@',
+      ' import x from "x";',
+      '+console.log(process.env.SECRET);',
+      ' export default x;',
+    ].join('\n');
+    const diff = await new MockGitClient({ diff: twoFiles }).diff();
+    const llm = new MockLLMProvider('openai', { structured: fixture });
+
+    const outcome = await reviewPullRequest({
+      systemPrompt: 's',
+      model: 'gpt-4.1',
+      diff,
+      llm,
+      strategy: 'map-reduce',
+      skills: [
+        { name: 'first-skill', description: 'Do A.', body: 'A rules', trusted: true },
+        { name: 'second-skill', description: 'Do B.', body: 'B rules', trusted: false },
+      ],
+    });
+
+    expect(outcome.mode).toBe('map-reduce');
+    const calls = llm.calls.filter((c) => c.method === 'completeStructured');
+    expect(calls).toHaveLength(2);
+    for (const c of calls) {
+      const user = (c.req as { messages: { content: string }[] }).messages[1]!.content;
+      expect(user).toContain('## Skills / rules');
+      expect(user.indexOf('### first-skill')).toBeLessThan(user.indexOf('### second-skill'));
+      expect(user).toContain('<untrusted source="skill:second-skill">');
+    }
+  });
+
   it('forwards sessionId to every LLM call (OpenRouter session grouping)', async () => {
     const seen: (string | undefined)[] = [];
     const recorder: LLMProvider = {
