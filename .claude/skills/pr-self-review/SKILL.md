@@ -3,7 +3,7 @@ name: pr-self-review
 description: "Manual pre-PR self-review of the current branch against main: committed, staged, unstaged and untracked changes. Runs typecheck, unit tests and the onion dependency gate for the changed packages, routes each changed surface (client, server/reviewer-core, e2e, rest) to the project skills, reports CRITICAL/WARNING/SUGGESTION findings with file:line, and ends with READY or NOT READY. Run as /pr-self-review [base-ref] before opening a PR."
 disable-model-invocation: true
 argument-hint: "[base-ref]"
-version: "1.0.0"
+version: "1.0.1"
 ---
 
 # PR self-review — before you open a PR
@@ -28,4 +28,5 @@ Reference files: [routing.md](routing.md) (scope, surfaces, skills) · [severity
 
 ## Changelog
 
+- **1.0.1** (2026-11-26) — Fix a false CRITICAL `migration-edit` on `server/src/db/migrations/meta/_journal.json`: `db:generate` appends to the journal for every new migration, so a journal change that comes with a new `.sql` is now `migration-new`. `migration-edit` stays for a changed or deleted `.sql` or snapshot, and for a journal change without a new `.sql`.
 - **1.0.0** (2026-11-26) — First version for DevDigest L02 (A4). Manual only. Severity scale matches the findings contract. Deterministic checks run before the LLM pass, with an OLD bucket for pre-existing failures. The depcruise gate counts only violations in changed files. Skeptic pass on CRITICALs, PR draft on READY, report in `.pr-self-review.md`. Adapted from the lecturer's reference (`upstream/lesson-2-lab/skills`), without its hook, state file and diff hash.
