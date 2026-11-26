@@ -2,7 +2,12 @@ import type { Skill, SkillDetail, SkillImportPreview, SkillSource, SkillType } f
 import type { Container } from '../../platform/container.js';
 import { SkillsRepository } from './repository.js';
 import { skillNameTakenError, toSkillDetailDto, toSkillDto } from './helpers.js';
-import { IMPORT_MAX_ENTRIES, IMPORT_MAX_FILE_BYTES, SKILL_MD_MAX_BYTES } from './constants.js';
+import {
+  IMPORT_MAX_BASE64_CHARS,
+  IMPORT_MAX_ENTRIES,
+  IMPORT_MAX_FILE_BYTES,
+  SKILL_MD_MAX_BYTES,
+} from './constants.js';
 import {
   buildPreview,
   classifyIgnored,
@@ -90,6 +95,11 @@ export class SkillsService {
    * unpacked, every other entry is listed by path and never run or stored.
    */
   async previewImport(workspaceId: string, upload: SkillUpload): Promise<SkillImportPreview> {
+    // Refuse an oversized upload before decoding it; the decoded size is
+    // checked again below (padding makes the base64 length an upper bound).
+    if (upload.content_base64.length > IMPORT_MAX_BASE64_CHARS) {
+      throw importError('too_large', 'The file is over 1 MB');
+    }
     const bytes = new Uint8Array(Buffer.from(upload.content_base64, 'base64'));
     if (bytes.length === 0) throw importError('unsupported_file', 'The file is empty');
     if (bytes.length > IMPORT_MAX_FILE_BYTES) throw importError('too_large', 'The file is over 1 MB');

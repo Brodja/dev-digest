@@ -283,6 +283,10 @@ export class AgentsRepository {
    */
   async replaceSkillLinks(agentId: string, links: SkillLinkInput[]): Promise<void> {
     await this.db.transaction(async (tx) => {
+      // Serialize concurrent replaces of the same agent: lock its row first.
+      // Without it two transactions both delete the old links, then both
+      // insert, and the second hits the (agent_id, skill_id) primary key → 500.
+      await tx.select({ id: t.agents.id }).from(t.agents).where(eq(t.agents.id, agentId)).for('update');
       await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
       if (links.length === 0) return;
       await tx.insert(t.agentSkills).values(

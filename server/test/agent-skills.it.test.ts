@@ -159,6 +159,28 @@ d('agent skill links (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('parallel PUTs on one agent all succeed and leave one complete set', async () => {
+    const app = await makeApp();
+    const agent = await newAgent(app);
+    const ids = [(await newSkill(app)).id, (await newSkill(app)).id, (await newSkill(app)).id];
+    // Different orders / subsets, sent at once (the Skills tab sends one PUT per click).
+    const sets = [ids, [...ids].reverse(), ids.slice(0, 2), [ids[2]!, ids[0]!], ids, [...ids].reverse()];
+    const responses = await Promise.all(
+      sets.map((set) => put(app, agent.id, set.map((skill_id) => ({ skill_id, enabled: true })))),
+    );
+    expect(responses.map((r) => r.statusCode)).toEqual(sets.map(() => 200));
+
+    // The final state is exactly one of the sets that were sent (no mix, no duplicates).
+    const final = (await app.inject({ method: 'GET', url: `/agents/${agent.id}/skills` })).json() as {
+      skill_id: string;
+      order: number;
+    }[];
+    const finalIds = final.map((l) => l.skill_id);
+    expect(final.map((l) => l.order)).toEqual(finalIds.map((_, i) => i));
+    expect(sets.map((s) => JSON.stringify(s))).toContain(JSON.stringify(finalIds));
+    await app.close();
+  });
+
   it('an agent version snapshot lists only the enabled links, in order', async () => {
     const app = await makeApp();
     const agent = await newAgent(app);

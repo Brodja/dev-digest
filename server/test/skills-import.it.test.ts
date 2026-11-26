@@ -172,7 +172,13 @@ d('skill import (Testcontainers pg)', () => {
     expect(await reasonOf(await preview(app, 'fake.zip', strToU8('# just text')))).toBe('unsupported_file');
     expect(await reasonOf(await preview(app, 'run.sh', strToU8('echo')))).toBe('unsupported_file');
     expect(await reasonOf(await preview(app, 'bad.md', new Uint8Array([0x23, 0x20, 0xff, 0xfe])))).toBe('not_utf8');
-    expect(await reasonOf(await preview(app, 'big.md', strToU8('x'.repeat(1_100_000))))).toBe('too_large');
+    const overLimit = await preview(app, 'big.md', strToU8('x'.repeat(1_100_000)));
+    expect(await reasonOf(overLimit)).toBe('too_large');
+    expect(overLimit.json().error.message).toBe('The file is over 1 MB');
+    // Exactly 1 MB passes the file-size gate and is stopped by the body limit instead.
+    const atLimit = await preview(app, 'edge.md', strToU8('x'.repeat(1_048_576)));
+    expect(await reasonOf(atLimit)).toBe('too_large');
+    expect(atLimit.json().error.message).toMatch(/body is over/);
     expect(await reasonOf(await preview(app, 'bomb.zip', zip({ 'SKILL.md': 'a'.repeat(300 * 1024) })))).toBe(
       'too_large',
     );
