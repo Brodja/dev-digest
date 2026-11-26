@@ -45,7 +45,7 @@ Postgres only: `docker compose up -d` from the repo root.
 ## Do not touch
 
 - Lockfiles (`pnpm-lock.yaml`, `package-lock.json`) — change only via that package's own manager; never npm in client/server, never pnpm in reviewer-core/e2e.
-- `server/src/db/migrations/**` — generated and already applied; see `server/CLAUDE.md`.
+- `server/src/db/migrations/**` — generated and already applied; see `server/AGENTS.md`.
 - `.env`, `.env.local`, `~/.devdigest/secrets.json` — secrets: don't read, print, or commit.
 - `server/clones/` — runtime checkouts of imported repos (git-ignored; includes a copy of this repo — not our source).
 - Generated output: `client/.next/`, `dist/`, `node_modules/`.
@@ -56,5 +56,5 @@ Postgres only: `docker compose up -d` from the repo root.
 
 - [README.md](README.md) — architecture, quick start, roadmap · [TESTING.md](TESTING.md) — test strategy, CI map.
 - [docs/agent-prompts/](docs/agent-prompts/README.md) — reviewer agent prompts and their conventions.
-- Every package has `CLAUDE.md` (loads when you work there), `README.md`, `docs/`, `INSIGHTS.md`; client, server and reviewer-core also have `specs/`.
+- Every package has `AGENTS.md` (its `CLAUDE.md` is a one-line `@AGENTS.md` import, so it loads when you work there; edit `AGENTS.md`), `README.md`, `docs/`, `INSIGHTS.md`; client, server and reviewer-core also have `specs/`.
 - Before working in a package, read its `INSIGHTS.md`.
