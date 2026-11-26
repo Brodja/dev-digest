@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
+import { LOCAL_ERROR_TOAST } from "../mutation-meta";
 import type { Agent, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
@@ -97,11 +98,13 @@ export interface SetAgentSkillsInput {
 
 /**
  * Replace the agent's skill set (PUT). Optimistic: the Skills tab reorders /
- * toggles instantly and rolls back if the server refuses.
+ * toggles instantly and rolls back if the server refuses. The caller shows the
+ * error toast (it knows the change was undone), so the global one is skipped.
  */
 export function useSetAgentSkills() {
   const qc = useQueryClient();
   return useMutation({
+    meta: LOCAL_ERROR_TOAST,
     mutationFn: ({ agentId, links }: SetAgentSkillsInput) =>
       api.put<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
     onMutate: async ({ agentId, links }) => {

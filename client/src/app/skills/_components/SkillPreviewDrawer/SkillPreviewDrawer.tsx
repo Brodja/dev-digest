@@ -35,6 +35,8 @@ export function SkillPreviewDrawer({
         toast.success(t("preview.deleted", { name: skill.name }));
         onClose();
       },
+      onError: (err) =>
+        toast.error(t("preview.deleteFailed", { name: skill.name, message: (err as Error).message })),
     });
   };
 

@@ -4,6 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
+import { LOCAL_ERROR_TOAST } from "../mutation-meta";
 import type { Skill, SkillDetail, SkillImportPreview, SkillType } from "@devdigest/shared";
 
 export function useSkills() {
@@ -43,9 +44,11 @@ export interface UpdateSkillInput {
   patch: Partial<SkillInput>;
 }
 
+/** Callers show their own error (card toast, editor inline), not the global toast. */
 export function useUpdateSkill() {
   const qc = useQueryClient();
   return useMutation({
+    meta: LOCAL_ERROR_TOAST,
     mutationFn: ({ id, patch }: UpdateSkillInput) => api.put<Skill>(`/skills/${id}`, patch),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["skills"] });
@@ -54,9 +57,11 @@ export function useUpdateSkill() {
   });
 }
 
+/** The preview drawer shows the error toast (with the skill's name). */
 export function useDeleteSkill() {
   const qc = useQueryClient();
   return useMutation({
+    meta: LOCAL_ERROR_TOAST,
     mutationFn: (id: string) => api.del<{ ok: boolean }>(`/skills/${id}`),
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["skills"] });

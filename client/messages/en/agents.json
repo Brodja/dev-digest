@@ -107,7 +107,8 @@
     "unlink": "Unlink {name}",
     "globallyDisabled": "off on the Skills page — not sent",
     "untrusted": "untrusted",
-    "loadError": "Could not load this agent's skills."
+    "loadError": "Could not load this agent's skills.",
+    "saveFailed": "Could not save the skill links — your change was undone. {message}"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

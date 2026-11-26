@@ -11,6 +11,7 @@ import { Badge, EmptyState, ErrorState, Icon, IconBtn, SearchableSelect, Skeleto
 import { SkillTypeBadge } from "@/components/SkillTypeBadge";
 import { useAgentSkills, useSetAgentSkills } from "@/lib/hooks/agents";
 import { useSkills } from "@/lib/hooks/skills";
+import { useToast } from "@/lib/toast";
 import { linkedRows, moveItem, toLinkInputs, type LinkInput } from "./helpers";
 import { useDragReorder } from "./hooks";
 import { s } from "./styles";
@@ -18,13 +19,19 @@ import { s } from "./styles";
 export function SkillsTab({ agentId }: { agentId: string }) {
   const t = useTranslations("agents");
   const router = useRouter();
+  const toast = useToast();
   const links = useAgentSkills(agentId);
   const skills = useSkills();
   const setLinks = useSetAgentSkills();
 
   const rows = linkedRows(links.data ?? [], skills.data ?? []);
   const current = toLinkInputs(rows);
-  const commit = (next: LinkInput[]) => setLinks.mutate({ agentId, links: next });
+  // The hook already rolled the optimistic change back; say so.
+  const commit = (next: LinkInput[]) =>
+    setLinks.mutate(
+      { agentId, links: next },
+      { onError: (err) => toast.error(t("skills.saveFailed", { message: (err as Error).message })) },
+    );
   const move = (from: number, to: number) => commit(moveItem(current, from, to));
   const { dragIndex, overIndex, rowProps } = useDragReorder(move);
 

@@ -84,4 +84,13 @@ describe("SkillPreviewDrawer", () => {
     expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining("removed from all agents"));
     expect(del).toHaveBeenCalledWith("s1", expect.anything());
   });
+
+  it("a failed delete shows an error toast and keeps the drawer open", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    del.mockImplementation((_id, opts: { onError?: (e: unknown) => void }) => opts.onError?.(new Error("network down")));
+    const { onClose } = renderDrawer();
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText("Could not delete “secret-leakage-gate”: network down")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

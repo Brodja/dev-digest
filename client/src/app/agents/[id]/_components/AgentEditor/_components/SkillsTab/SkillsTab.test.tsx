@@ -3,6 +3,8 @@ import { render, screen, cleanup, fireEvent, within } from "@testing-library/rea
 import { NextIntlClientProvider } from "next-intl";
 import type { AgentSkillLink, Skill } from "@devdigest/shared";
 import agents from "../../../../../../../../messages/en/agents.json";
+import { ToastProvider } from "@/lib/toast";
+import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
@@ -55,7 +57,9 @@ afterEach(cleanup);
 function renderTab() {
   render(
     <NextIntlClientProvider locale="en" messages={{ agents }}>
-      <SkillsTab agentId="ag1" />
+      <ToastProvider>
+        <SkillsTab agentId="ag1" />
+      </ToastProvider>
     </NextIntlClientProvider>,
   );
 }
@@ -130,6 +134,17 @@ describe("Agent editor → Skills tab", () => {
     fireEvent.click(screen.getByText("skill-d"));
     expect(sent().links.at(-1)).toEqual({ skill_id: "d", enabled: true });
     expect(sent().links).toHaveLength(4);
+  });
+
+  it("says the change was undone when the server refuses it", async () => {
+    setLinks.mockImplementation((_input, opts: { onError?: (e: unknown) => void }) =>
+      opts.onError?.(new ApiError("Unknown skill for this workspace", 422, "validation_error")),
+    );
+    renderTab();
+    fireEvent.click(screen.getByRole("switch", { name: "Send skill-a in this agent's prompt" }));
+    expect(
+      await screen.findByText("Could not save the skill links — your change was undone. Unknown skill for this workspace"),
+    ).toBeInTheDocument();
   });
 
   it("points to the Skills page when the workspace has no skills", () => {

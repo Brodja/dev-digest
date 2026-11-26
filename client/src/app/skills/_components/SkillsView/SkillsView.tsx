@@ -8,6 +8,7 @@ import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdi
 import type { Skill } from "@devdigest/shared";
 import { AppShell } from "@/components/app-shell";
 import { useSkills, useUpdateSkill } from "@/lib/hooks/skills";
+import { useToast } from "@/lib/toast";
 import { SkillCard } from "../SkillCard";
 import { SkillPreviewDrawer } from "../SkillPreviewDrawer";
 import { SkillEditorModal } from "../SkillEditorModal";
@@ -20,8 +21,17 @@ type EditorState = { mode: "create" } | { mode: "edit"; skill: Skill } | null;
 
 export function SkillsView() {
   const t = useTranslations("skills");
+  const toast = useToast();
   const { data: skills, isLoading, isError, refetch } = useSkills();
   const update = useUpdateSkill();
+  const toggle = (skill: Skill, enabled: boolean) =>
+    update.mutate(
+      { id: skill.id, patch: { enabled } },
+      {
+        onError: (err) =>
+          toast.error(t("card.toggleFailed", { name: skill.name, message: (err as Error).message })),
+      },
+    );
   const [search, setSearch] = React.useState("");
   const [previewId, setPreviewId] = React.useState<string | null>(null);
   const [editor, setEditor] = React.useState<EditorState>(null);
@@ -90,7 +100,7 @@ export function SkillsView() {
                 skill={sk}
                 active={sk.id === previewId}
                 onOpen={() => setPreviewId(sk.id)}
-                onToggle={(enabled) => update.mutate({ id: sk.id, patch: { enabled } })}
+                onToggle={(enabled) => toggle(sk, enabled)}
               />
             ))}
           </div>

@@ -60,7 +60,8 @@
   "card": {
     "toggle": "Enable {name} for every agent that links it",
     "untrusted": "untrusted",
-    "disabled": "disabled"
+    "disabled": "disabled",
+    "toggleFailed": "Could not switch “{name}”: {message}"
   },
   "preview": {
     "description": "Description",
@@ -75,6 +76,7 @@
     "delete": "Delete",
     "deleteConfirm": "Delete skill “{name}”? It is removed from all agents. This can't be undone.",
     "deleted": "Skill “{name}” deleted",
+    "deleteFailed": "Could not delete “{name}”: {message}",
     "loadError": "Could not load this skill."
   },
   "editor": {

@@ -89,8 +89,15 @@ describe("SkillsView (/skills)", () => {
   it("the card toggle saves enabled without opening the preview", () => {
     renderView();
     fireEvent.click(screen.getByRole("switch", { name: /Enable pr-quality-rubric/ }));
-    expect(update).toHaveBeenCalledWith({ id: "s2", patch: { enabled: false } });
+    expect(update).toHaveBeenCalledWith({ id: "s2", patch: { enabled: false } }, expect.anything());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("a failed toggle shows an error toast", async () => {
+    update.mockImplementation((_input, opts: { onError?: (e: unknown) => void }) => opts.onError?.(new Error("boom")));
+    renderView();
+    fireEvent.click(screen.getByRole("switch", { name: /Enable pr-quality-rubric/ }));
+    expect(await screen.findByText("Could not switch “pr-quality-rubric”: boom")).toBeInTheDocument();
   });
 
   it("Add → Create skill opens the editor", () => {
