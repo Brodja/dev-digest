@@ -9,7 +9,16 @@ import { EMPTY_SKILL, estimateTokens, validateSkill, type SkillFormValues } from
 afterEach(cleanup);
 
 /** Controlled host, like the modal. */
-function Host({ initial = EMPTY_SKILL, ...props }: { initial?: SkillFormValues; showRequired?: boolean; nameTaken?: boolean }) {
+function Host({
+  initial = EMPTY_SKILL,
+  ...props
+}: {
+  initial?: SkillFormValues;
+  showRequired?: boolean;
+  nameTaken?: boolean;
+  bodyDirty?: boolean;
+  bodyHint?: string;
+}) {
   const [values, setValues] = React.useState(initial);
   return (
     <NextIntlClientProvider locale="en" messages={{ skills }}>
@@ -32,6 +41,16 @@ describe("SkillForm", () => {
     expect(screen.getByText(/≈ 0 tokens/)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Skill body" }), { target: { value: "x".repeat(41) } });
     expect(screen.getByText(/≈ 11 tokens/)).toBeInTheDocument();
+  });
+
+  it("edits the body in a code editor named after the skill, marked unsaved when dirty", () => {
+    const initial = { ...EMPTY_SKILL, name: "my-rule", body: "a" };
+    const { rerender } = render(<Host initial={initial} />);
+    expect(screen.getByText("my-rule.md")).toBeInTheDocument();
+    expect(screen.queryByText("unsaved")).toBeNull();
+    rerender(<Host initial={initial} bodyDirty bodyHint="Rules only." />);
+    expect(screen.getByText("unsaved")).toBeInTheDocument();
+    expect(screen.getByText("Rules only.")).toBeInTheDocument();
   });
 
   it("shows a bad slug at once, required errors only after a save attempt", () => {

@@ -95,6 +95,7 @@
     "bodyHint": "Markdown rules, sent to the model right after the description.",
     "bodyPlaceholder": "- Treat …",
     "tokens": "≈ {count, number} tokens",
+    "unsaved": "unsaved",
     "save": "Save skill",
     "saving": "Saving…",
     "cancel": "Cancel",

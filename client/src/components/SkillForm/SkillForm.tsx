@@ -1,12 +1,13 @@
 /* SkillForm — the controlled skill fields: name, description (with the
-   "write it as a directive" hint), type, enabled and the markdown body with a
-   token estimate. Shared by /skills (create/edit modal, import preview) and the
-   Conventions page's "Accept as Skill" modal (type locked to convention). */
+   "write it as a directive" hint), type, enabled and the markdown body in a
+   code editor with a token estimate. Shared by /skills (create modal, import
+   preview, the skill page's Config tab) and the Conventions page's "Accept as
+   Skill" modal (type locked to convention). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { FormField, SelectInput, TextInput, Textarea, Toggle } from "@devdigest/ui";
+import { CodeEditor, FormField, SelectInput, TextInput, Toggle } from "@devdigest/ui";
 import type { SkillType } from "@devdigest/shared";
 import { SkillTypeBadge } from "@/components/SkillTypeBadge";
 import { SKILL_TYPES } from "@/lib/skill-fields";
@@ -20,6 +21,8 @@ export function SkillForm({
   nameTaken,
   hideEnabled,
   lockedType,
+  bodyDirty,
+  bodyHint,
 }: {
   values: SkillFormValues;
   onChange: (patch: Partial<SkillFormValues>) => void;
@@ -31,6 +34,10 @@ export function SkillForm({
   hideEnabled?: boolean;
   /** The caller decides the type (conventions → convention): shown read-only. */
   lockedType?: SkillType;
+  /** The body differs from the saved one: the editor header says "unsaved". */
+  bodyDirty?: boolean;
+  /** Replaces the default hint under the body. */
+  bodyHint?: string;
 }) {
   const t = useTranslations("skills");
   const issues = validateSkill(values);
@@ -102,21 +109,13 @@ export function SkillForm({
         )}
       </div>
 
-      <FormField
-        label={t("editor.body")}
-        required
-        hint={t("editor.bodyHint")}
-        right={
-          <span className="mono" style={s.tokens}>
-            {(values.name || "skill") + ".md"} · {t("editor.tokens", { count: estimateTokens(values.body) })}
-          </span>
-        }
-      >
-        <Textarea
-          mono
-          rows={14}
+      <FormField label={t("editor.body")} required hint={bodyHint ?? t("editor.bodyHint")}>
+        <CodeEditor
           value={values.body}
           onChange={(body) => onChange({ body })}
+          filename={(values.name || "skill") + ".md"}
+          status={bodyDirty ? t("editor.unsaved") : undefined}
+          meta={t("editor.tokens", { count: estimateTokens(values.body) })}
           placeholder={t("editor.bodyPlaceholder")}
           aria-label={t("editor.body")}
           aria-invalid={!!errorOf("body")}
