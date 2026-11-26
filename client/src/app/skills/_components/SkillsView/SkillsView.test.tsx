@@ -23,6 +23,8 @@ vi.mock("@/lib/hooks/skills", () => ({
     refetch: vi.fn(),
   }),
   useDeleteSkill: () => ({ mutate: vi.fn(), isPending: false }),
+  useImportSkillPreview: () => ({ mutate: vi.fn(), isPending: false }),
+  useImportSkill: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { SkillsView } from "./SkillsView";
@@ -97,6 +99,14 @@ describe("SkillsView (/skills)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
     expect(within(screen.getByRole("dialog")).getByText("Create skill")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Description" })).toBeInTheDocument();
+  });
+
+  it("Add → Import from file opens the import modal", () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: /Add Skill/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
+    expect(within(screen.getByRole("dialog")).getByText("Import skill")).toBeInTheDocument();
+    expect(screen.getByLabelText("Skill file")).toBeInTheDocument();
   });
 
   it("shows the empty state when the workspace has no skills", () => {

@@ -16,6 +16,7 @@ export function SkillForm({
   onChange,
   showRequired,
   nameTaken,
+  hideEnabled,
 }: {
   values: SkillFormValues;
   onChange: (patch: Partial<SkillFormValues>) => void;
@@ -23,6 +24,8 @@ export function SkillForm({
   showRequired?: boolean;
   /** The server answered 409 for this name. */
   nameTaken?: boolean;
+  /** Import: the skill is always saved disabled, so the switch is not offered. */
+  hideEnabled?: boolean;
 }) {
   const t = useTranslations("skills");
   const issues = validateSkill(values);
@@ -79,11 +82,13 @@ export function SkillForm({
             />
           </FormField>
         </div>
-        <div style={s.enabledCol}>
-          <FormField label={t("editor.enabled")} hint={t("editor.enabledHint")}>
-            <Toggle on={values.enabled} onChange={(enabled) => onChange({ enabled })} label={t("editor.enabled")} />
-          </FormField>
-        </div>
+        {!hideEnabled && (
+          <div style={s.enabledCol}>
+            <FormField label={t("editor.enabled")} hint={t("editor.enabledHint")}>
+              <Toggle on={values.enabled} onChange={(enabled) => onChange({ enabled })} label={t("editor.enabled")} />
+            </FormField>
+          </div>
+        )}
       </div>
 
       <FormField

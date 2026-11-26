@@ -18,5 +18,9 @@ export const SOURCE_ICONS: Record<SkillSource, IconName> = {
   imported_file: "Upload",
 };
 
+/** Import: same upload limit as the server (checked in the browser first). */
+export const IMPORT_MAX_FILE_BYTES = 1_048_576;
+export const IMPORT_ACCEPT = ".md,.markdown,.zip,.skill";
+
 /** Card grid (responsive auto-fill), same as the agents list. */
 export const CARD_GRID_COLS = "repeat(auto-fill, minmax(280px, 1fr))";

@@ -153,6 +153,34 @@ export const SkillDetail = Skill.extend({
 });
 export type SkillDetail = z.infer<typeof SkillDetail>;
 
+/** Why a file of an imported archive was left out (it is never run or stored). */
+export const IgnoredFileReason = z.enum(['script', 'other']);
+export type IgnoredFileReason = z.infer<typeof IgnoredFileReason>;
+
+/**
+ * POST /skills/import/preview — what an upload would become. Nothing is stored
+ * until the user confirms with POST /skills/import.
+ */
+export const SkillImportPreview = z.object({
+  draft: z.object({
+    name: z.string(),
+    description: z.string(),
+    type: SkillType,
+    body: z.string(),
+  }),
+  origin: z.object({
+    filename: z.string(),
+    kind: z.enum(['markdown', 'archive']),
+    /** The file the core came from: the upload itself, or SKILL.md inside the archive. */
+    skill_path: z.string(),
+  }),
+  ignored: z.array(z.object({ path: z.string(), reason: IgnoredFileReason })),
+  warnings: z.array(z.string()),
+  /** The workspace already has a skill with draft.name. */
+  name_taken: z.boolean(),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
 export const CommunitySkill = z.object({
   name: z.string(),
   repo: z.string(),

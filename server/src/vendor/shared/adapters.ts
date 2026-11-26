@@ -104,6 +104,33 @@ export interface Tokenizer {
   count(text: string): number;
 }
 
+// ---------- Archive (zip) ----------
+/** One file of an archive, as listed in its central directory. */
+export interface ArchiveEntry {
+  /** Path inside the archive, "/"-separated. Directories are not listed. */
+  path: string;
+  /** Size the entry DECLARES once unpacked (from the header, not verified). */
+  uncompressedSize: number;
+}
+
+export type ArchiveReadResult =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; reason: 'too_large' | 'missing' };
+
+/**
+ * Read-only, in-memory access to a zip archive (skill import). Nothing is ever
+ * written to disk and no entry is ever executed.
+ */
+export interface ArchiveReader {
+  /** List the file entries WITHOUT decompressing any of them. Throws on a corrupt or unsupported archive. */
+  entries(bytes: Uint8Array): ArchiveEntry[];
+  /**
+   * Decompress ONE entry. Refuses before inflating when its declared size is
+   * over `maxBytes`, and again after when the real size is (a header can lie).
+   */
+  read(bytes: Uint8Array, path: string, maxBytes: number): ArchiveReadResult;
+}
+
 // ---------- GitHub (Octokit REST, thin) ----------
 export interface RepoRef {
   owner: string;

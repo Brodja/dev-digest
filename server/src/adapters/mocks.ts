@@ -1,5 +1,8 @@
 import type { z } from 'zod';
 import type {
+  ArchiveEntry,
+  ArchiveReadResult,
+  ArchiveReader,
   LLMProvider,
   ModelInfo,
   CompletionRequest,
@@ -326,5 +329,28 @@ export class MockSecretsProvider implements SecretsProvider {
   constructor(private secrets: Partial<Record<string, string>> = {}) {}
   async get(key: SecretKey): Promise<string | undefined> {
     return this.secrets[key as string];
+  }
+}
+
+// ---------- Mock ArchiveReader ----------
+/**
+ * In-memory archive: `files` maps path → text. The bytes passed in are ignored;
+ * every read is recorded in `reads` so tests can prove which entries were opened.
+ */
+export class MockArchiveReader implements ArchiveReader {
+  public reads: string[] = [];
+  constructor(private files: Record<string, string> = {}) {}
+  entries(): ArchiveEntry[] {
+    return Object.entries(this.files).map(([path, text]) => ({
+      path,
+      uncompressedSize: new TextEncoder().encode(text).length,
+    }));
+  }
+  read(_bytes: Uint8Array, path: string, maxBytes: number): ArchiveReadResult {
+    this.reads.push(path);
+    const text = this.files[path];
+    if (text === undefined) return { ok: false, reason: 'missing' };
+    const bytes = new TextEncoder().encode(text);
+    return bytes.length > maxBytes ? { ok: false, reason: 'too_large' } : { ok: true, bytes };
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  ArchiveReader,
   AuthProvider,
   SecretsProvider,
   GitHubClient,
@@ -30,6 +31,7 @@ import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { FflateArchiveReader } from '../adapters/archive/fflate.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -53,6 +55,8 @@ export interface ContainerOverrides {
   depgraph?: DepGraph;
   /** Token counter: repo-map budget (repo-intel) + skills tokens in the run trace. */
   tokenizer?: Tokenizer;
+  /** In-memory zip reader for skill import. */
+  archive?: ArchiveReader;
 }
 
 export class Container {
@@ -77,6 +81,7 @@ export class Container {
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
+  private _archive?: ArchiveReader;
   private _priceBook?: PriceBook;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
@@ -133,6 +138,13 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** In-memory zip reader (fflate) for skill import — never writes to disk. */
+  get archive(): ArchiveReader {
+    if (this.overrides.archive) return this.overrides.archive;
+    this._archive ??= new FflateArchiveReader();
+    return this._archive;
   }
 
   /**

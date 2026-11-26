@@ -99,7 +99,7 @@ review executor use it without importing each other.
 | `PUT /skills/:id` | any subset of `{ name, description, type, body, enabled }` | `Skill`; `version + 1` only if `body` changed |
 | `DELETE /skills/:id` | — | `{ ok: true }`; its links go by cascade |
 | `POST /skills/import/preview` | `{ filename, content_base64 }` | `SkillImportPreview`. **Writes nothing** (no DB row, no file) |
-| `POST /skills/import` | `{ filename, name, description, type, body }` | 201 `Skill`, `source = imported_file`, `enabled = false`, `version = 1` |
+| `POST /skills/import` | `{ name, description, type, body }` (`source` and `enabled` are set by the server) | 201 `Skill`, `source = imported_file`, `enabled = false`, `version = 1` |
 | `GET /agents/:id/skills` | — | `AgentSkillLink[]` (`skill_id`, `order`, `enabled`), sorted by `order` |
 | `PUT /agents/:id/skills` | `{ links: [{ skill_id, enabled }] }` (array order = prompt order) | `AgentSkillLink[]`. Replaces the whole set in one transaction |
 | `POST /agents/:id/skills` | existing `{ skill_ids }` / `{ skill_id, order? }` | kept for compatibility; now goes through the same replace path, keeps each link's `enabled` and checks the workspace |

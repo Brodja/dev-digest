@@ -4,7 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Skill, SkillDetail, SkillType } from "@devdigest/shared";
+import type { Skill, SkillDetail, SkillImportPreview, SkillType } from "@devdigest/shared";
 
 export function useSkills() {
   return useQuery({
@@ -64,5 +64,27 @@ export function useDeleteSkill() {
       // Its links went by cascade.
       qc.invalidateQueries({ queryKey: ["agent-skills"] });
     },
+  });
+}
+
+export interface SkillUploadInput {
+  filename: string;
+  /** The file's bytes, base64 (no data: prefix). */
+  content_base64: string;
+}
+
+/** Upload → draft + what is ignored. Stores nothing (no cache either). */
+export function useImportSkillPreview() {
+  return useMutation({
+    mutationFn: (input: SkillUploadInput) => api.post<SkillImportPreview>("/skills/import/preview", input),
+  });
+}
+
+/** Save the confirmed draft: an untrusted, disabled imported skill. */
+export function useImportSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<SkillInput, "enabled">) => api.post<Skill>("/skills/import", input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
   });
 }

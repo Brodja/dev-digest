@@ -6,13 +6,48 @@
     "subtitle": "Review rules your agents add to their prompt. Link a skill to an agent in the agent's Skills tab.",
     "addSkill": "Add Skill",
     "createSkill": "Create skill",
+    "importSkill": "Import from file",
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "noMatch": "No skills match “{q}”.",
     "empty": {
       "title": "No skills yet",
-      "body": "A skill is a set of review rules in markdown. Create one, then link it to an agent.",
+      "body": "A skill is a set of review rules in markdown. Create one or import a SKILL.md / skill archive (Add Skill), then link it to an agent.",
       "cta": "Create skill"
+    }
+  },
+  "import": {
+    "title": "Import skill",
+    "subtitle": "From a markdown file or a skill archive",
+    "pickTitle": "Choose a SKILL.md, a .md file or a skill archive (.zip / .skill)",
+    "pickHint": "Up to 1 MB. Only the SKILL.md is used: scripts and other files in an archive are listed, never run or stored. Nothing is saved until you confirm.",
+    "choose": "Choose file",
+    "dropHere": "or drop it here",
+    "fileLabel": "Skill file",
+    "reading": "Reading…",
+    "readFailed": "Could not read the file.",
+    "from": "From",
+    "untrustedNotice": "Imported skills are untrusted: they reach the prompt only as delimited data, and they are saved disabled — turn the skill on after you have read it.",
+    "warnings": "Check before saving",
+    "ignored": "{count, plural, one {# file} other {# files}} ignored — never run or stored",
+    "reason": {
+      "script": "script",
+      "other": "not used"
+    },
+    "preview": "Preview — as the reviewer will read it",
+    "back": "Back",
+    "cancel": "Cancel",
+    "save": "Import skill",
+    "saving": "Importing…",
+    "saved": "Imported “{name}” — disabled until you turn it on",
+    "saveFailed": "Could not import the skill.",
+    "errors": {
+      "unsupported_file": "Upload a .md file or a .zip / .skill archive.",
+      "no_skill_md": "The archive has no SKILL.md.",
+      "multiple_skill_md": "The archive holds several skills — import one at a time.",
+      "too_large": "Too large: the file is limited to 1 MB, SKILL.md to 256 KB unpacked, the body to 40,000 characters.",
+      "too_many_entries": "The archive has too many files (limit: 200).",
+      "not_utf8": "The skill file is not valid UTF-8 text."
     }
   },
   "source": {

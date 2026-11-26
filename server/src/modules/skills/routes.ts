@@ -7,6 +7,7 @@ import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
 import { SkillsService } from './service.js';
 import {
+  IMPORT_BODY_LIMIT_BYTES,
   SKILL_BODY_MAX,
   SKILL_DESCRIPTION_MAX,
   SKILL_NAME_HINT,
@@ -20,6 +21,8 @@ import {
  *   POST   /skills       → create (source = manual, v1)
  *   PUT    /skills/:id   → partial update; a changed body bumps the version
  *   DELETE /skills/:id   → delete (links + versions cascade)
+ *   POST   /skills/import/preview → upload (.md / .zip / .skill, base64) → draft; writes nothing
+ *   POST   /skills/import → save the confirmed draft (source = imported_file, disabled)
  * Linking skills to an agent lives in the agents module (/agents/:id/skills).
  */
 
@@ -37,6 +40,16 @@ const CreateSkillBody = z.object({
   body: SkillBody,
   enabled: z.boolean().optional(),
 });
+
+/** The size limit is checked on the decoded bytes in the service (422 too_large);
+    the route bodyLimit (413) only stops payloads far past it. */
+const ImportPreviewBody = z.object({
+  filename: z.string().min(1).max(255),
+  content_base64: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, 'content_base64 must be base64'),
+});
+
+/** The confirmed draft; source and enabled are set by the server. */
+const ImportSkillBody = CreateSkillBody.omit({ enabled: true });
 
 const UpdateSkillBody = z.object({
   name: SkillName.optional(),
@@ -79,6 +92,22 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
       return skill;
     },
   );
+
+  app.post(
+    '/skills/import/preview',
+    { bodyLimit: IMPORT_BODY_LIMIT_BYTES, schema: { body: ImportPreviewBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      return service.previewImport(workspaceId, req.body);
+    },
+  );
+
+  app.post('/skills/import', { schema: { body: ImportSkillBody } }, async (req, reply) => {
+    const { workspaceId } = await getContext(app.container, req);
+    const skill = await service.confirmImport(workspaceId, req.body);
+    reply.status(201);
+    return skill;
+  });
 
   app.delete('/skills/:id', { schema: { params: IdParams } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);

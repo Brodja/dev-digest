@@ -1,5 +1,5 @@
 /* /skills — the Skills page (server/specs/002-skills.md): a grid of skill cards,
-   a side preview on click, and Add → Create (Import arrives with Part 3). */
+   a side preview on click, and Add → Create skill / Import from file. */
 "use client";
 
 import React from "react";
@@ -11,6 +11,7 @@ import { useSkills, useUpdateSkill } from "@/lib/hooks/skills";
 import { SkillCard } from "../SkillCard";
 import { SkillPreviewDrawer } from "../SkillPreviewDrawer";
 import { SkillEditorModal } from "../SkillEditorModal";
+import { ImportSkillModal } from "../ImportSkillModal";
 import { filterSkills } from "./helpers";
 import { s } from "./styles";
 
@@ -24,6 +25,7 @@ export function SkillsView() {
   const [search, setSearch] = React.useState("");
   const [previewId, setPreviewId] = React.useState<string | null>(null);
   const [editor, setEditor] = React.useState<EditorState>(null);
+  const [importing, setImporting] = React.useState(false);
 
   const all = skills ?? [];
   const list = filterSkills(all, search);
@@ -55,7 +57,10 @@ export function SkillsView() {
                 {t("page.addSkill")}
               </Button>
             }
-            items={[{ label: t("page.createSkill"), icon: "Edit", onClick: openCreate }]}
+            items={[
+              { label: t("page.createSkill"), icon: "Edit", onClick: openCreate },
+              { label: t("page.importSkill"), icon: "Upload", onClick: () => setImporting(true) },
+            ]}
           />
         </div>
 
@@ -103,6 +108,7 @@ export function SkillsView() {
       {editor && (
         <SkillEditorModal skill={editor.mode === "edit" ? editor.skill : undefined} onClose={() => setEditor(null)} />
       )}
+      {importing && <ImportSkillModal onClose={() => setImporting(false)} />}
     </AppShell>
   );
 }
