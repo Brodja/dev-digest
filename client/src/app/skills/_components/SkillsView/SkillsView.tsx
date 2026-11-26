@@ -1,124 +1,40 @@
-/* /skills — the Skills page (server/specs/002-skills.md): a grid of skill cards,
-   a side preview on click, and Add → Create skill / Import from file. */
+/* SkillsView — the Skills Lab frame (screen_skills.jsx, client/specs/004):
+   the skill list on the left, the selected skill on the right. /skills renders
+   it with a placeholder; /skills/:id passes the skill editor as children. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
-import type { Skill } from "@devdigest/shared";
+import { EmptyState, type Crumb } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
-import { useSkills, useUpdateSkill } from "@/lib/hooks/skills";
-import { useToast } from "@/lib/toast";
-import { SkillCard } from "../SkillCard";
-import { SkillPreviewDrawer } from "../SkillPreviewDrawer";
-import { SkillEditorModal } from "../SkillEditorModal";
-import { ImportSkillModal } from "../ImportSkillModal";
-import { filterSkills } from "./helpers";
+import { SkillsSidebar } from "../SkillsSidebar";
 import { s } from "./styles";
 
-/** Which editor is open: a new skill, or an existing one. */
-type EditorState = { mode: "create" } | { mode: "edit"; skill: Skill } | null;
-
-export function SkillsView() {
+export function SkillsView({
+  activeId,
+  tab,
+  crumb,
+  children,
+}: {
+  activeId?: string;
+  /** The skill page's tab, kept when another skill is picked. */
+  tab?: string;
+  crumb?: Crumb[];
+  children?: React.ReactNode;
+}) {
   const t = useTranslations("skills");
-  const toast = useToast();
-  const { data: skills, isLoading, isError, refetch } = useSkills();
-  const update = useUpdateSkill();
-  const toggle = (skill: Skill, enabled: boolean) =>
-    update.mutate(
-      { id: skill.id, patch: { enabled } },
-      {
-        onError: (err) =>
-          toast.error(t("card.toggleFailed", { name: skill.name, message: (err as Error).message })),
-      },
-    );
-  const [search, setSearch] = React.useState("");
-  const [previewId, setPreviewId] = React.useState<string | null>(null);
-  const [editor, setEditor] = React.useState<EditorState>(null);
-  const [importing, setImporting] = React.useState(false);
-
-  const all = skills ?? [];
-  const list = filterSkills(all, search);
-  const openCreate = () => setEditor({ mode: "create" });
-
   return (
-    <AppShell crumb={[{ label: t("page.crumbLab") }, { label: t("page.crumbSkills") }]}>
-      <div style={s.page}>
-        <div style={s.header}>
-          <div style={s.headerText}>
-            <h1 style={s.h1}>{t("page.heading")}</h1>
-            <p style={s.subtitle}>{t("page.subtitle")}</p>
-          </div>
-          <div style={s.search}>
-            <Icon.Search size={13} style={s.searchIcon} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("page.searchPlaceholder")}
-              aria-label={t("page.searchPlaceholder")}
-              style={s.searchInput}
-            />
-          </div>
-          <Dropdown
-            width={220}
-            align="right"
-            trigger={
-              <Button kind="primary" size="sm" icon="Plus" iconRight="ChevronDown">
-                {t("page.addSkill")}
-              </Button>
-            }
-            items={[
-              { label: t("page.createSkill"), icon: "Edit", onClick: openCreate },
-              { label: t("page.importSkill"), icon: "Upload", onClick: () => setImporting(true) },
-            ]}
-          />
-        </div>
-
-        {isLoading && (
-          <div style={s.grid}>
-            <Skeleton height={110} />
-            <Skeleton height={110} />
-            <Skeleton height={110} />
-          </div>
-        )}
-        {isError && <ErrorState body={t("page.loadError")} onRetry={() => refetch()} />}
-        {!isLoading && !isError && all.length === 0 && (
-          <EmptyState
-            icon="Sparkles"
-            title={t("page.empty.title")}
-            body={t("page.empty.body")}
-            cta={t("page.empty.cta")}
-            onCta={openCreate}
-          />
-        )}
-        {all.length > 0 && list.length === 0 && <p style={s.noMatch}>{t("page.noMatch", { q: search })}</p>}
-        {list.length > 0 && (
-          <div style={s.grid}>
-            {list.map((sk) => (
-              <SkillCard
-                key={sk.id}
-                skill={sk}
-                active={sk.id === previewId}
-                onOpen={() => setPreviewId(sk.id)}
-                onToggle={(enabled) => toggle(sk, enabled)}
-              />
-            ))}
-          </div>
-        )}
+    <AppShell crumb={crumb ?? [{ label: t("page.crumbLab") }, { label: t("page.crumbSkills") }]}>
+      <div style={s.frame}>
+        <SkillsSidebar activeId={activeId} tab={tab} />
+        <main style={s.main}>
+          {children ?? (
+            <div style={s.placeholder}>
+              <EmptyState icon="Sparkles" title={t("page.pickTitle")} body={t("page.pickBody")} />
+            </div>
+          )}
+        </main>
       </div>
-
-      {previewId && (
-        <SkillPreviewDrawer
-          skillId={previewId}
-          onClose={() => setPreviewId(null)}
-          onEdit={(skill) => setEditor({ mode: "edit", skill })}
-        />
-      )}
-      {/* Rendered after the drawer so the modal stacks on top of it. */}
-      {editor && (
-        <SkillEditorModal skill={editor.mode === "edit" ? editor.skill : undefined} onClose={() => setEditor(null)} />
-      )}
-      {importing && <ImportSkillModal onClose={() => setImporting(false)} />}
     </AppShell>
   );
 }

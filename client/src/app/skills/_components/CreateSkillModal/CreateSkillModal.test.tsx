@@ -7,50 +7,50 @@ import { ToastProvider } from "@/lib/toast";
 import { ApiError } from "@/lib/api";
 
 const create = vi.fn();
-const update = vi.fn();
 vi.mock("@/lib/hooks/skills", () => ({
   useCreateSkill: () => ({ mutate: create, isPending: false }),
-  useUpdateSkill: () => ({ mutate: update, isPending: false }),
 }));
 
-import { SkillEditorModal } from "./SkillEditorModal";
+import { CreateSkillModal } from "./CreateSkillModal";
 
 beforeEach(() => {
   create.mockReset();
-  update.mockReset();
 });
 afterEach(cleanup);
 
-const SKILL: Skill = {
-  id: "s1",
+const CREATED: Skill = {
+  id: "s9",
   name: "secret-leakage-gate",
-  description: "Flag secrets.",
+  description: "Flag any hard-coded secret.",
   type: "security",
   source: "manual",
-  body: "- rules",
+  body: "- sk_live_ keys are CRITICAL",
   enabled: true,
   version: 1,
   evidence_files: null,
   trusted: true,
 };
 
-function renderModal(skill?: Skill, onClose = vi.fn()) {
+function renderModal() {
+  const onClose = vi.fn();
+  const onCreated = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={{ skills }}>
       <ToastProvider>
-        <SkillEditorModal skill={skill} onClose={onClose} />
+        <CreateSkillModal onClose={onClose} onCreated={onCreated} />
       </ToastProvider>
     </NextIntlClientProvider>,
   );
-  return { onClose };
+  return { onClose, onCreated };
 }
 
 const type = (name: string, value: string) =>
   fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } });
 
-describe("SkillEditorModal", () => {
-  it("creates a skill with the typed fields", () => {
-    renderModal();
+describe("CreateSkillModal", () => {
+  it("creates a skill with the typed fields, then hands it over to open its page", () => {
+    create.mockImplementation((_input, opts: { onSuccess: (s: Skill) => void }) => opts.onSuccess(CREATED));
+    const { onClose, onCreated } = renderModal();
     expect(screen.getByText("Create skill")).toBeInTheDocument();
     type("Name", "secret-leakage-gate");
     type("Description", "  Flag any hard-coded secret.  ");
@@ -65,6 +65,8 @@ describe("SkillEditorModal", () => {
       body: "- sk_live_ keys are CRITICAL",
       enabled: true,
     });
+    expect(onClose).toHaveBeenCalled();
+    expect(onCreated).toHaveBeenCalledWith(CREATED);
   });
 
   it("does not send an invalid form and shows what is missing", () => {
@@ -74,36 +76,24 @@ describe("SkillEditorModal", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(3);
   });
 
-  it("shows a 409 next to the name", () => {
+  it("shows a 409 next to the name and stays open", () => {
     create.mockImplementation((_input, opts: { onError: (e: unknown) => void }) =>
       opts.onError(new ApiError('A skill named "x" already exists', 409, "skill_name_taken")),
     );
-    renderModal();
+    const { onClose, onCreated } = renderModal();
     type("Name", "taken-name");
     type("Description", "Do X.");
     type("Skill body", "rules");
     fireEvent.click(screen.getByRole("button", { name: "Save skill" }));
     expect(screen.getByRole("alert")).toHaveTextContent("A skill with this name already exists.");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("edits: sends only the changed fields", () => {
-    renderModal(SKILL);
-    expect(screen.getByText("Edit skill")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("secret-leakage-gate");
-    type("Description", "Flag any committed secret.");
-    fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save skill" }));
-    expect(update).toHaveBeenCalledTimes(1);
-    expect(update.mock.calls[0]![0]).toEqual({
-      id: "s1",
-      patch: { description: "Flag any committed secret.", enabled: false },
-    });
-  });
-
-  it("edits with no change just closes", () => {
-    const { onClose } = renderModal(SKILL);
-    fireEvent.click(screen.getByRole("button", { name: "Save skill" }));
-    expect(update).not.toHaveBeenCalled();
+  it("Cancel sends nothing", () => {
+    const { onClose } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(create).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 });

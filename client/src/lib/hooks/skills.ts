@@ -1,11 +1,19 @@
-/* hooks/skills.ts — React Query hooks for the Skills page (server/specs/002-skills.md).
-   Linking skills to an agent lives in hooks/agents.ts (useAgentSkills / useSetAgentSkills). */
+/* hooks/skills.ts — React Query hooks for the Skills pages (server/specs/002-skills.md,
+   client/specs/004-skills-lab-design.md). Linking skills to an agent lives in hooks/agents.ts
+   (useAgentSkills / useSetAgentSkills). */
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import { LOCAL_ERROR_TOAST } from "../mutation-meta";
-import type { Skill, SkillDetail, SkillImportPreview, SkillType } from "@devdigest/shared";
+import type {
+  Skill,
+  SkillDetail,
+  SkillImportPreview,
+  SkillStats,
+  SkillType,
+  SkillVersion,
+} from "@devdigest/shared";
 
 export function useSkills() {
   return useQuery({
@@ -14,7 +22,7 @@ export function useSkills() {
   });
 }
 
-/** One skill + the agents that link it (side preview). */
+/** One skill + the agents that link it (the skill page). */
 export function useSkill(id: string | null | undefined) {
   return useQuery({
     queryKey: ["skill", id],
@@ -44,20 +52,54 @@ export interface UpdateSkillInput {
   patch: Partial<SkillInput>;
 }
 
+/** Every cached view of one skill after it changed (a body change adds a version). */
+function invalidateSkill(qc: ReturnType<typeof useQueryClient>, id: string) {
+  qc.invalidateQueries({ queryKey: ["skills"] });
+  qc.invalidateQueries({ queryKey: ["skill", id] });
+  qc.invalidateQueries({ queryKey: ["skill-versions", id] });
+  qc.invalidateQueries({ queryKey: ["skill-stats", id] });
+}
+
 /** Callers show their own error (card toast, editor inline), not the global toast. */
 export function useUpdateSkill() {
   const qc = useQueryClient();
   return useMutation({
     meta: LOCAL_ERROR_TOAST,
     mutationFn: ({ id, patch }: UpdateSkillInput) => api.put<Skill>(`/skills/${id}`, patch),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["skills"] });
-      qc.invalidateQueries({ queryKey: ["skill", data.id] });
-    },
+    onSuccess: (data) => invalidateSkill(qc, data.id),
   });
 }
 
-/** The preview drawer shows the error toast (with the skill's name). */
+/** Body history, newest first (Versions tab). */
+export function useSkillVersions(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["skill-versions", id],
+    queryFn: () => api.get<SkillVersion[]>(`/skills/${id}/versions`),
+    enabled: !!id,
+  });
+}
+
+/** Bring an old body back as the next version. The caller toasts the outcome. */
+export function useRestoreSkillVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: LOCAL_ERROR_TOAST,
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.post<Skill>(`/skills/${id}/restore`, { version }),
+    onSuccess: (data) => invalidateSkill(qc, data.id),
+  });
+}
+
+/** Agents that link the skill + its version count (Stats tab). */
+export function useSkillStats(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["skill-stats", id],
+    queryFn: () => api.get<SkillStats>(`/skills/${id}/stats`),
+    enabled: !!id,
+  });
+}
+
+/** The caller shows the error toast (with the skill's name). */
 export function useDeleteSkill() {
   const qc = useQueryClient();
   return useMutation({
@@ -66,6 +108,8 @@ export function useDeleteSkill() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.removeQueries({ queryKey: ["skill", id] });
+      qc.removeQueries({ queryKey: ["skill-versions", id] });
+      qc.removeQueries({ queryKey: ["skill-stats", id] });
       // Its links went by cascade.
       qc.invalidateQueries({ queryKey: ["agent-skills"] });
     },

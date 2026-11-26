@@ -39,15 +39,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function renderModal(onClose = vi.fn()) {
+function renderModal(onClose = vi.fn(), onImported = vi.fn()) {
   render(
     <NextIntlClientProvider locale="en" messages={{ skills }}>
       <ToastProvider>
-        <ImportSkillModal onClose={onClose} />
+        <ImportSkillModal onClose={onClose} onImported={onImported} />
       </ToastProvider>
     </NextIntlClientProvider>,
   );
-  return { onClose };
+  return { onClose, onImported };
 }
 
 const pick = (file: File) => fireEvent.change(screen.getByLabelText("Skill file"), { target: { files: [file] } });
@@ -107,9 +107,9 @@ describe("ImportSkillModal", () => {
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
-  it("stores only on Import skill, with the edited fields", async () => {
-    importMutate.mockImplementation((_input, opts: Opts) => opts.onSuccess?.({ name: "owasp-strict" }));
-    const { onClose } = renderModal();
+  it("stores only on Import skill, with the edited fields, then hands the skill over", async () => {
+    importMutate.mockImplementation((_input, opts: Opts) => opts.onSuccess?.({ id: "s7", name: "owasp-strict" }));
+    const { onClose, onImported } = renderModal();
     await pickAndPreview();
     expect(importMutate).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "owasp-strict" } });
@@ -121,6 +121,7 @@ describe("ImportSkillModal", () => {
       body: PREVIEW.draft.body,
     });
     expect(onClose).toHaveBeenCalled();
+    expect(onImported).toHaveBeenCalledWith({ id: "s7", name: "owasp-strict" });
   });
 
   it("Cancel after the preview stores nothing", async () => {

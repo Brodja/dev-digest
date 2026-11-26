@@ -1,7 +1,7 @@
 import { SkillsView } from "./_components/SkillsView";
 
-/* Route: /skills (Skills page). Thin route entry — the grid, preview drawer and
-   editor modal live under _components/ (server/specs/002-skills.md). */
+/* Route: /skills (Skills Lab). Thin route entry — the skill list on the left and
+   a "pick a skill" placeholder; a skill opens /skills/:id (client/specs/004). */
 export default function SkillsPage() {
   return <SkillsView />;
 }

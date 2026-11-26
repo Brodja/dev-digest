@@ -1,13 +1,14 @@
-/* SkillCard — one skill in the /skills grid: name, type, one-line description,
-   source, untrusted badge and the global enabled toggle. Clicking the card opens
-   the side preview; the toggle saves at once and does not open it. */
+/* SkillCard — one skill in the Skills Lab list (screen_skills.jsx): an icon
+   tinted by type, the mono name, the global enabled toggle, a one-line
+   description, the type chip and the source; untrusted / disabled marks.
+   Clicking the card opens the skill's page; the toggle saves at once. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
-import { SkillTypeBadge } from "@/components/SkillTypeBadge";
+import { SKILL_TYPE_COLORS, SkillTypeBadge } from "@/components/SkillTypeBadge";
 import { SOURCE_ICONS } from "../../constants";
 import { s } from "./styles";
 
@@ -24,17 +25,19 @@ export function SkillCard({
 }) {
   const t = useTranslations("skills");
   const SourceIcon = Icon[SOURCE_ICONS[skill.source]];
+  const tint = SKILL_TYPE_COLORS[skill.type] ?? SKILL_TYPE_COLORS.custom;
   return (
-    // Mouse: the whole card opens the preview. Keyboard: the name is the button
+    // Mouse: the whole card opens the skill. Keyboard: the name is the button
     // (a role="button" card would nest the toggle's <button> inside it).
-    <div onClick={onOpen} style={s.card(!!active, skill.enabled)}>
+    <div onClick={onOpen} style={s.card(!!active, skill.enabled)} data-active={active ? "true" : undefined}>
       <div style={s.headerRow}>
-        <div style={s.iconBox}>
+        <div style={s.iconBox(tint.color, tint.bg)}>
           <Icon.Sparkles size={14} />
         </div>
         <button
           type="button"
           className="mono"
+          aria-current={active ? "page" : undefined}
           onClick={(e) => {
             e.stopPropagation();
             onOpen();

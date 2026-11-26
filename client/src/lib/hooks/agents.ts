@@ -124,8 +124,9 @@ export function useSetAgentSkills() {
       qc.setQueryData(["agent-skills", agentId], data);
     },
     onSettled: () => {
-      // A skill's "used by" list depends on its links.
+      // A skill's "used by" list and its stats depend on its links.
       qc.invalidateQueries({ queryKey: ["skill"] });
+      qc.invalidateQueries({ queryKey: ["skill-stats"] });
     },
   });
 }

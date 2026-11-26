@@ -7,7 +7,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Icon, Markdown, Modal } from "@devdigest/ui";
-import type { SkillImportPreview } from "@devdigest/shared";
+import type { Skill, SkillImportPreview } from "@devdigest/shared";
 import { ApiError } from "@/lib/api";
 import { useImportSkill, useImportSkillPreview } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
@@ -16,7 +16,14 @@ import { SkillForm, EMPTY_SKILL, validateSkill, type SkillFormValues } from "@/c
 import { importFailureOf, readFileAsBase64 } from "./helpers";
 import { s } from "./styles";
 
-export function ImportSkillModal({ onClose }: { onClose: () => void }) {
+export function ImportSkillModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  /** The saved skill (the list opens its page). */
+  onImported?: (skill: Skill) => void;
+}) {
   const t = useTranslations("skills");
   const toast = useToast();
   const previewImport = useImportSkillPreview();
@@ -85,6 +92,7 @@ export function ImportSkillModal({ onClose }: { onClose: () => void }) {
         onSuccess: (skill) => {
           toast.success(t("import.saved", { name: skill.name }));
           onClose();
+          onImported?.(skill);
         },
         onError: (err) => {
           if (err instanceof ApiError && err.status === 409) setNameTaken(true);

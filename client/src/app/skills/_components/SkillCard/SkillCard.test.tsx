@@ -39,14 +39,14 @@ describe("SkillCard", () => {
     expect(screen.queryByText("untrusted")).not.toBeInTheDocument();
   });
 
-  it("the toggle saves enabled and does not open the preview", () => {
+  it("the toggle saves enabled and does not open the skill", () => {
     const { onOpen, onToggle } = renderCard(SKILL);
     fireEvent.click(screen.getByRole("switch", { name: /Enable secret-leakage-gate/ }));
     expect(onToggle).toHaveBeenCalledWith(false);
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("a click on the card or its name opens the preview", () => {
+  it("a click on the card or its name opens the skill", () => {
     const { onOpen } = renderCard(SKILL);
     fireEvent.click(screen.getByText("Flag any hard-coded secret added in the diff."));
     fireEvent.click(screen.getByRole("button", { name: "secret-leakage-gate" }));
