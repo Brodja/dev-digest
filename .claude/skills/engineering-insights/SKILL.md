@@ -48,7 +48,7 @@ Run this step on every task; writing is conditional.
    - a competent agent reading the code at that spot would not see it within a few minutes;
    - it changes what a future agent does, or saves it 5+ minutes;
    - it is specific to this repo, not general TypeScript/React/SQL knowledge;
-   - it is not already in that package's `CLAUDE.md`, `README.md`, `docs/`, or the root `CLAUDE.md`;
+   - it is not already in that package's `AGENTS.md`, `README.md`, `docs/`, or the root `AGENTS.md`;
    - you can cite a `path:line` you opened and checked in this task.
 
    Usually 0–3 entries per task; more than 5 means you are writing a diary.
@@ -80,6 +80,6 @@ Good:
 Bad — don't write:
 
 - `SSE is tricky` — vague, no action, no evidence.
-- `server typecheck needs reviewer-core/node_modules` — already in the root CLAUDE.md.
+- `server typecheck needs reviewer-core/node_modules` — already in the root AGENTS.md.
 - `Added RunCostBadge to the PR header` — a changelog line; git log already has it.
 - `measured · tests pass` — no number, no conditions.
