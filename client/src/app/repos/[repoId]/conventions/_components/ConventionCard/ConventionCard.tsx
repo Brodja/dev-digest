@@ -1,15 +1,16 @@
-/* ConventionCard — one candidate: the rule (editable), its evidence (file:lines
-   linking to GitHub at the commit the evidence was checked against, plus the
-   real snippet), confidence, and Accept / Reject (a second click moves the
-   candidate back to review). An accepted card can also be included in, or left
-   out of, the next skill (P3: several skills from different selections). */
+/* ConventionCard — one candidate (screen_conv_conf.jsx ConventionCard): the
+   rule (click it to edit in place), its evidence (file:lines linking to GitHub
+   at the commit the evidence was checked against, a copy button and the real
+   snippet), confidence, and Accept / Reject on the right (a second click moves
+   the candidate back to review). Rejected cards stay in place, dimmed. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, Checkbox, IconBtn, MonoLink, ProgressBar, Textarea } from "@devdigest/ui";
+import { Button, IconBtn, MonoLink, ProgressBar, Textarea } from "@devdigest/ui";
 import type { ConventionCandidate, ConventionStatus } from "@devdigest/shared";
 import { githubBlobUrl } from "@/lib/github-urls";
+import { useToast } from "@/lib/toast";
 import { lineRef } from "@/app/repos/[repoId]/conventions/helpers";
 import { s } from "./styles";
 
@@ -23,7 +24,6 @@ export function ConventionCard({
   repo,
   onSetStatus,
   onSaveRule,
-  selection,
 }: {
   candidate: ConventionCandidate;
   /** Null until the repos list has loaded: the evidence is shown without a link. */
@@ -31,10 +31,9 @@ export function ConventionCard({
   onSetStatus: (status: ConventionStatus) => void;
   /** Resolves when saved; the card leaves edit mode only then. */
   onSaveRule: (rule: string) => Promise<unknown>;
-  /** Accepted cards only: whether this convention goes into the next skill. */
-  selection?: { checked: boolean; onChange: (checked: boolean) => void };
 }) {
   const t = useTranslations("conventions");
+  const toast = useToast();
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(c.rule);
   const [saving, setSaving] = React.useState(false);
@@ -62,13 +61,31 @@ export function ConventionCard({
       setSaving(false);
     }
   };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(c.evidence_snippet);
+      toast.success(t("card.copied"));
+    } catch {
+      toast.error(t("card.copyFailed"));
+    }
+  };
 
   return (
     <article aria-label={c.rule} style={s.card(c.status)}>
       <div style={s.main}>
         {editing ? (
           <div>
-            <Textarea rows={3} value={draft} onChange={setDraft} aria-label={t("card.editLabel")} autoFocus />
+            <Textarea
+              rows={3}
+              value={draft}
+              onChange={setDraft}
+              aria-label={t("card.editLabel")}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditing(false);
+                else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void save();
+              }}
+            />
             <div style={s.editActions}>
               <Button kind="primary" size="sm" icon="Check" onClick={save} disabled={!draft.trim() || saving} loading={saving}>
                 {t("card.save")}
@@ -79,10 +96,15 @@ export function ConventionCard({
             </div>
           </div>
         ) : (
-          <div style={s.ruleRow}>
-            <p style={s.rule}>{c.rule}</p>
-            <IconBtn icon="Edit" label={t("card.edit")} size={26} onClick={startEdit} />
-          </div>
+          <button
+            type="button"
+            onClick={startEdit}
+            title={t("card.editHint")}
+            aria-label={`${t("card.edit")}: ${c.rule}`}
+            style={s.rule}
+          >
+            {c.rule}
+          </button>
         )}
 
         <div style={s.evidence}>
@@ -94,6 +116,7 @@ export function ConventionCard({
             ) : (
               <span className="mono">{label}</span>
             )}
+            <IconBtn icon="Copy" label={t("card.copy")} size={22} onClick={copy} />
           </div>
           <pre className="mono" style={s.snippet}>
             {c.evidence_snippet}
@@ -145,11 +168,6 @@ export function ConventionCard({
           <Button kind="ghost" size="sm" icon="X" full onClick={() => onSetStatus("rejected")}>
             {t("card.reject")}
           </Button>
-        )}
-        {selection && (
-          <div style={s.include}>
-            <Checkbox checked={selection.checked} onChange={selection.onChange} label={t("card.include")} />
-          </div>
         )}
       </div>
     </article>

@@ -28,8 +28,22 @@ export const s = {
     opacity: status === "rejected" ? 0.6 : 1,
   }),
   main: { flex: 1, minWidth: 0 } satisfies CSSProperties,
-  ruleRow: { display: "flex", alignItems: "flex-start", gap: 8 } satisfies CSSProperties,
-  rule: { flex: 1, fontSize: 14, fontWeight: 600, fontStyle: "italic", lineHeight: 1.4 } satisfies CSSProperties,
+  /** The rule is a button (click to edit in place) that reads as text. */
+  rule: {
+    display: "block",
+    width: "100%",
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    textAlign: "left",
+    cursor: "text",
+    color: "var(--text-primary)",
+    fontFamily: "inherit",
+    fontSize: 14,
+    fontWeight: 600,
+    fontStyle: "italic",
+    lineHeight: 1.4,
+  } satisfies CSSProperties,
   editActions: { display: "flex", gap: 8, marginTop: 8 } satisfies CSSProperties,
   evidence: {
     marginTop: 10,
@@ -38,7 +52,11 @@ export const s = {
     overflow: "hidden",
   } satisfies CSSProperties,
   evidenceHead: {
-    padding: "5px 10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    padding: "3px 6px 3px 10px",
     background: "var(--bg-surface)",
     borderBottom: "1px solid var(--border)",
     fontSize: 12.5,
@@ -58,5 +76,4 @@ export const s = {
   confBar: { width: 90 } satisfies CSSProperties,
   confValue: { fontSize: 11, color: "var(--text-secondary)" } satisfies CSSProperties,
   actions: { display: "flex", flexDirection: "column", gap: 7, flexShrink: 0, width: 150 } satisfies CSSProperties,
-  include: { marginTop: 4, fontSize: 12 } satisfies CSSProperties,
 } as const;

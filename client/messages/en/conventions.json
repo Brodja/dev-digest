@@ -18,13 +18,13 @@
     "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files",
     "scanSummary": "{files, plural, one {# sampled file} other {# sampled files}} · last scan {when}",
     "droppedSummary": "{count, plural, one {# proposal dropped} other {# proposals dropped}} without evidence",
+    "acceptedCount": "{count} of {total} accepted",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "bulkFailed": "Could not update {failed} of {total} conventions — try again.",
+    "scanningRepo": "Scanning repository…",
+    "listLabel": "Convention candidates",
     "nothingGrounded": "The last scan found no convention it could back with evidence from the code. Re-scan to try again.",
-    "selected": "{selected} of {accepted} accepted selected for the skill",
-    "sections": {
-      "pending": "To review",
-      "accepted": "Accepted",
-      "rejected": "Rejected"
-    },
     "errors": {
       "repo_not_indexed": "This repository has no index to sample files from yet. Resync it, then run the extraction again.",
       "repo_intel_disabled": "Repo intelligence is turned off on the server (REPO_INTEL_ENABLED=false), so there are no files to sample.",
@@ -45,15 +45,20 @@
     "undoAccepted": "Accepted — click to move back to review",
     "undoRejected": "Rejected — click to move back to review",
     "edit": "Edit rule",
+    "editHint": "Click to edit the rule",
     "editLabel": "Rule text",
     "save": "Save",
     "cancel": "Cancel",
     "evidenceLink": "Open {file} on GitHub at these lines",
-    "include": "Include in skill"
+    "copy": "Copy snippet",
+    "copied": "Snippet copied",
+    "copyFailed": "Could not copy the snippet."
   },
   "modal": {
     "title": "Create skill from conventions",
     "merged": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "bodyHint": "The only text sent to the model: the accepted rules with their file:line references. Code from the repository stays out on purpose — this skill is trusted, so code in it would reach the prompt without the untrusted wrapper.",
+    "savedAs": "Saved as v1 · added to Skills Lab",
     "cancel": "Cancel",
     "create": "Create skill",
     "creating": "Creating…",

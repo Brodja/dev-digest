@@ -1,6 +1,7 @@
 /* hooks/conventions.ts — React Query hooks for the Conventions page
-   (server/specs/003-conventions.md): latest scan + candidates, run a scan,
-   accept / reject / edit a candidate, build a skill from accepted ones. */
+   (server/specs/003-conventions.md, client/specs/004): latest scan + candidates,
+   run a scan, accept / reject / edit a candidate (one or all at once), build a
+   skill from the accepted ones. */
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -50,11 +51,38 @@ export function useUpdateConvention(repoId: string) {
   });
 }
 
+/** Result of a bulk status change: how many of the PATCHes failed. */
+export interface BulkStatusResult {
+  total: number;
+  failed: number;
+}
+
+/**
+ * Select all / Deselect all: one PATCH per candidate (a scan keeps at most a
+ * few dozen), in parallel, then one refetch. Resolves with the failure count —
+ * the page says how many did not change, so no global toast per request.
+ */
+export function useSetConventionStatuses(repoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: LOCAL_ERROR_TOAST,
+    mutationFn: async ({ ids, status }: { ids: readonly string[]; status: ConventionStatus }): Promise<BulkStatusResult> => {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.patch<ConventionCandidate>(`/repos/${repoId}/conventions/${id}`, { status })),
+      );
+      return { total: ids.length, failed: results.filter((r) => r.status === "rejected").length };
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["conventions", repoId] }),
+  });
+}
+
 export interface ConventionSkillInput {
   name: string;
   description: string;
   body: string;
   convention_ids: string[];
+  /** Omitted → the server creates it enabled. */
+  enabled?: boolean;
 }
 
 /** The modal shows 409 / 422 inline, so no global toast. Saved as convention / extracted. */

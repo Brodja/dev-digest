@@ -16,5 +16,13 @@ export const s = {
   } satisfies CSSProperties,
   mergedIcon: { color: "var(--accent)", flexShrink: 0 } satisfies CSSProperties,
   footer: { display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" } satisfies CSSProperties,
-  failed: { fontSize: 12.5, color: "var(--crit)", marginRight: "auto" } satisfies CSSProperties,
+  savedAs: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11.5,
+    color: "var(--text-muted)",
+    marginRight: "auto",
+  } satisfies CSSProperties,
+  failed: { fontSize: 12.5, color: "var(--crit)" } satisfies CSSProperties,
 } as const;

@@ -1,7 +1,8 @@
-/* CreateConventionSkillModal — "Accept as Skill": the draft built from the
-   accepted conventions, editable (name, description, markdown body) before it
-   is saved as a skill with type convention and source extracted. Nothing is
-   stored before "Create skill". */
+/* CreateConventionSkillModal — "Accept as Skill" (screen_conv_conf.jsx
+   CreateSkillModal): the draft built from the accepted conventions, editable
+   (name, description, enabled, markdown body) before it is saved as a skill with
+   type convention and source extracted. Nothing is stored before "Create skill".
+   Unlike the design, the body carries no code from the repo: see the body hint. */
 "use client";
 
 import React from "react";
@@ -24,7 +25,7 @@ export function CreateConventionSkillModal({
 }: {
   repoId: string;
   repoName: string;
-  /** The accepted (selected) conventions that go into the skill — read once, when the modal opens. */
+  /** The accepted conventions that go into the skill — read once, when the modal opens. */
   conventions: readonly ConventionCandidate[];
   onClose: () => void;
 }) {
@@ -68,6 +69,7 @@ export function CreateConventionSkillModal({
         description: values.description.trim(),
         body: values.body,
         convention_ids: [...conventionIds],
+        enabled: values.enabled,
       },
       {
         onSuccess: (skill) => {
@@ -91,6 +93,10 @@ export function CreateConventionSkillModal({
       onClose={onClose}
       footer={
         <div style={s.footer}>
+          <span style={s.savedAs}>
+            <Icon.GitCommit size={13} />
+            {t("modal.savedAs")}
+          </span>
           {failed && (
             <span role="alert" style={s.failed}>
               {failed}
@@ -115,8 +121,8 @@ export function CreateConventionSkillModal({
           onChange={onChange}
           showRequired={submitted}
           nameTaken={nameTaken}
-          hideEnabled
           lockedType="convention"
+          bodyHint={t("modal.bodyHint")}
         />
       </div>
     </Modal>

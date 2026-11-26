@@ -64,7 +64,19 @@ describe("CreateConventionSkillModal", () => {
     expect(body).toContain("2. Name files in kebab-case.");
     expect(screen.getByTestId("skill-type-locked")).toHaveTextContent("convention");
     expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.getByRole("switch", { name: "Enabled" })).toHaveAttribute("aria-checked", "true");
+    // The design's footer note, and why the body carries no code.
+    expect(screen.getByText("Saved as v1 · added to Skills Lab")).toBeInTheDocument();
+    expect(screen.getByText(/Code from the repository stays out on purpose/)).toBeInTheDocument();
+  });
+
+  it("sends Enabled as switched (off → the skill starts disabled)", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+    expect(mutate.mock.calls[0]![0]).toMatchObject({ enabled: true });
+    fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+    expect(mutate.mock.calls[1]![0]).toMatchObject({ enabled: false });
   });
 
   it("uses a free name when repo-conventions already exists", () => {

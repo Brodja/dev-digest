@@ -24,10 +24,12 @@ const refetch = vi.fn();
 const extract = { mutate: vi.fn(), isPending: false, isError: false, error: null as Error | null };
 const update = { mutate: vi.fn(), mutateAsync: vi.fn(async () => ({})) };
 const create = { mutate: vi.fn(), isPending: false };
+const bulk = { mutate: vi.fn(), isPending: false };
 vi.mock("@/lib/hooks/conventions", () => ({
   useConventions: () => ({ ...query, refetch }),
   useExtractConventions: () => extract,
   useUpdateConvention: () => update,
+  useSetConventionStatuses: () => bulk,
   useCreateConventionSkill: () => create,
 }));
 let existingSkills: { name: string }[] = [];
@@ -81,6 +83,8 @@ beforeEach(() => {
   extract.mutate.mockReset();
   update.mutate.mockReset();
   create.mutate.mockReset();
+  bulk.mutate.mockReset();
+  bulk.isPending = false;
   refetch.mockReset();
   existingSkills = [];
 });
@@ -108,13 +112,50 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
     expect(extract.mutate).toHaveBeenCalledTimes(1);
   });
 
-  it("lists candidates grouped by status, with the scan summary", () => {
+  it("lists every candidate in one list, in server order, with the scan summary and the accepted count", () => {
+    query = { data: { scan: scan(), candidates: [ACCEPTED, REJECTED, PENDING] }, isLoading: false, isError: false };
     renderView();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Conventions in acme/api");
     expect(screen.getByText(/3 candidates · grounded against sampled files · 16 sampled files · last scan 5 minutes ago · 1 proposal dropped without evidence/)).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "To review" })).getByText(PENDING.rule)).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Accepted" })).getByText(ACCEPTED.rule)).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Rejected" })).getByText(REJECTED.rule)).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Convention candidates" });
+    expect(within(list).getAllByRole("article").map((a) => a.getAttribute("aria-label"))).toEqual([
+      ACCEPTED.rule,
+      REJECTED.rule,
+      PENDING.rule,
+    ]);
+    expect(screen.queryByRole("region", { name: "To review" })).toBeNull();
+    expect(screen.getByText("1 of 3 accepted")).toBeInTheDocument();
+    // The rejected card stays in place, marked.
+    expect(within(screen.getByRole("article", { name: REJECTED.rule })).getByRole("button", { name: "Rejected" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("Select all accepts every candidate still to review (not the rejected ones)", () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(bulk.mutate).toHaveBeenCalledWith({ ids: ["p1"], status: "accepted" }, expect.anything());
+  });
+
+  it("with nothing left to review, Deselect all moves the accepted ones back; only rejected → no toggle", () => {
+    query = { data: { scan: scan(), candidates: [ACCEPTED, REJECTED] }, isLoading: false, isError: false };
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Deselect all" }));
+    expect(bulk.mutate).toHaveBeenCalledWith({ ids: ["a1"], status: "pending" }, expect.anything());
+    cleanup();
+    query = { data: { scan: scan(), candidates: [REJECTED] }, isLoading: false, isError: false };
+    renderView();
+    expect(screen.queryByRole("button", { name: /Select all|Deselect all/ })).toBeNull();
+  });
+
+  it("says how many conventions a bulk change could not update", async () => {
+    bulk.mutate.mockImplementation((_input, opts: { onSuccess: (r: { failed: number; total: number }) => void }) =>
+      opts.onSuccess({ failed: 1, total: 2 }),
+    );
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(await screen.findByText("Could not update 1 of 2 conventions — try again.")).toBeInTheDocument();
   });
 
   it("Accept on a card sends the status for that candidate", () => {
@@ -132,7 +173,9 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
     extract.isPending = true;
     renderView();
     expect(screen.getByRole("button", { name: "Scanning…" })).toBeDisabled();
+    expect(screen.getByText("Scanning repository…")).toHaveAttribute("role", "status");
     expect(screen.getByRole("button", { name: "Accept as Skill" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Select all" })).toBeDisabled();
   });
 
   it("Accept as Skill is disabled without accepted conventions, and opens the modal with the accepted ones only", () => {
@@ -151,79 +194,51 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
     expect(body).not.toContain(REJECTED.rule);
   });
 
-  describe("several skills from different selections (P3)", () => {
+  describe("several skills from different accepted sets (P3)", () => {
     const ACCEPTED_2 = cand("a2", "Name files in kebab-case.", "accepted");
     const bodyOfModal = () => (screen.getByRole("textbox", { name: "Skill body" }) as HTMLTextAreaElement).value;
-    const includeBox = (rule: string) =>
-      within(screen.getByRole("article", { name: rule })).getByRole("checkbox", { name: "Include in skill" });
 
     beforeEach(() => {
       query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, ACCEPTED_2, REJECTED] }, isLoading: false, isError: false };
     });
 
-    it("offers the checkbox on accepted cards only, all selected by default (main flow unchanged)", () => {
+    it("the accepted set is the skill: no per-card selection", () => {
       renderView();
-      expect(includeBox(ACCEPTED.rule)).toHaveAttribute("aria-checked", "true");
-      expect(includeBox(ACCEPTED_2.rule)).toHaveAttribute("aria-checked", "true");
-      expect(within(screen.getByRole("article", { name: PENDING.rule })).queryByRole("checkbox")).toBeNull();
-      expect(within(screen.getByRole("article", { name: REJECTED.rule })).queryByRole("checkbox")).toBeNull();
-      expect(screen.getByText("2 of 2 accepted selected for the skill")).toBeInTheDocument();
-
+      expect(screen.queryByRole("checkbox", { name: "Include in skill" })).toBeNull();
+      expect(screen.getByText("2 of 4 accepted")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
       expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("repo-conventions");
       expect(bodyOfModal()).toContain(ACCEPTED.rule);
       expect(bodyOfModal()).toContain(ACCEPTED_2.rule);
+      expect(bodyOfModal()).not.toContain(PENDING.rule);
+      expect(bodyOfModal()).not.toContain(REJECTED.rule);
     });
 
-    it("builds the skill from the selected subset only, and a second skill from another subset", () => {
-      renderView();
-      fireEvent.click(includeBox(ACCEPTED_2.rule));
-      expect(screen.getByText("1 of 2 accepted selected for the skill")).toBeInTheDocument();
+    it("builds a skill, then — after the accepted set changes — a second one under a free name", () => {
+      const { rerender } = renderView();
       fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+      expect(create.mutate.mock.calls[0]![0]).toMatchObject({ name: "repo-conventions", convention_ids: ["a1", "a2"] });
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      // Change the set: a2 back to review, p1 accepted; the first skill now exists.
+      fireEvent.click(within(screen.getByRole("article", { name: ACCEPTED_2.rule })).getByRole("button", { name: "Accepted" }));
+      expect(update.mutate).toHaveBeenLastCalledWith({ id: "a2", patch: { status: "pending" } });
+      fireEvent.click(within(screen.getByRole("article", { name: PENDING.rule })).getByRole("button", { name: "Accept" }));
+      expect(update.mutate).toHaveBeenLastCalledWith({ id: "p1", patch: { status: "accepted" } });
+      const p1 = { ...PENDING, status: "accepted" as const, accepted: true };
+      const a2 = { ...ACCEPTED_2, status: "pending" as const, accepted: false };
+      query = { data: { scan: scan(), candidates: [p1, ACCEPTED, a2, REJECTED] }, isLoading: false, isError: false };
+      existingSkills = [{ name: "repo-conventions" }];
+      rerender(ui());
+
+      fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("repo-conventions-2");
+      expect(bodyOfModal()).toContain(PENDING.rule);
       expect(bodyOfModal()).toContain(ACCEPTED.rule);
       expect(bodyOfModal()).not.toContain(ACCEPTED_2.rule);
       fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
-      expect(create.mutate.mock.calls[0]![0]).toMatchObject({ name: "repo-conventions", convention_ids: ["a1"] });
-      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-      // Second skill: the other convention, under another name (the first one now exists).
-      existingSkills = [{ name: "repo-conventions" }];
-      fireEvent.click(includeBox(ACCEPTED.rule));
-      fireEvent.click(includeBox(ACCEPTED_2.rule));
-      fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
-      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("repo-conventions-2");
-      expect(bodyOfModal()).toContain(ACCEPTED_2.rule);
-      expect(bodyOfModal()).not.toContain(ACCEPTED.rule);
-      fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
-      expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["a2"] });
-    });
-
-    it("a convention moved back to review and accepted again is selected again", () => {
-      const { rerender } = renderView();
-      fireEvent.click(includeBox(ACCEPTED_2.rule)); // leave it out
-      expect(screen.getByText("1 of 2 accepted selected for the skill")).toBeInTheDocument();
-
-      // Back to review (second click on "Accepted")…
-      fireEvent.click(within(screen.getByRole("article", { name: ACCEPTED_2.rule })).getByRole("button", { name: "Accepted" }));
-      expect(update.mutate).toHaveBeenLastCalledWith({ id: "a2", patch: { status: "pending" } });
-      const asPending = { ...ACCEPTED_2, status: "pending" as const, accepted: false };
-      query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, asPending, REJECTED] }, isLoading: false, isError: false };
-      rerender(ui());
-
-      // …and accepted again: selected for the skill, not left out.
-      fireEvent.click(within(screen.getByRole("article", { name: ACCEPTED_2.rule })).getByRole("button", { name: "Accept" }));
-      query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, ACCEPTED_2, REJECTED] }, isLoading: false, isError: false };
-      rerender(ui());
-      expect(includeBox(ACCEPTED_2.rule)).toHaveAttribute("aria-checked", "true");
-      expect(screen.getByText("2 of 2 accepted selected for the skill")).toBeInTheDocument();
-    });
-
-    it("disables Accept as Skill when nothing is selected", () => {
-      renderView();
-      fireEvent.click(includeBox(ACCEPTED.rule));
-      fireEvent.click(includeBox(ACCEPTED_2.rule));
-      expect(screen.getByText("0 of 2 accepted selected for the skill")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Accept as Skill" })).toBeDisabled();
+      expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["p1", "a1"] });
     });
   });
 

@@ -3,9 +3,13 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { NextIntlClientProvider } from "next-intl";
 import type { ConventionCandidate } from "@devdigest/shared";
 import conventions from "../../../../../../../messages/en/conventions.json";
+import { ToastProvider } from "@/lib/toast";
 import { ConventionCard, type ConventionRepo } from "./ConventionCard";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const REPO: ConventionRepo = { full_name: "acme/api", default_branch: "main" };
 
@@ -27,13 +31,17 @@ const candidate = (over: Partial<ConventionCandidate> = {}): ConventionCandidate
 function renderCard(c: ConventionCandidate, repo: ConventionRepo | null = REPO) {
   const onSetStatus = vi.fn();
   const onSaveRule = vi.fn(async () => ({}));
-  render(
+  const view = render(
     <NextIntlClientProvider locale="en" messages={{ conventions }}>
-      <ConventionCard candidate={c} repo={repo} onSetStatus={onSetStatus} onSaveRule={onSaveRule} />
+      <ToastProvider>
+        <ConventionCard candidate={c} repo={repo} onSetStatus={onSetStatus} onSaveRule={onSaveRule} />
+      </ToastProvider>
     </NextIntlClientProvider>,
   );
-  return { onSetStatus, onSaveRule };
+  return { onSetStatus, onSaveRule, container: view.container };
 }
+
+const editRule = () => screen.getByRole("button", { name: /^Edit rule/ });
 
 describe("ConventionCard", () => {
   it("shows the rule, the evidence (file:lines + real snippet) and the confidence", () => {
@@ -81,9 +89,9 @@ describe("ConventionCard", () => {
     expect(rejected.onSetStatus).toHaveBeenCalledWith("pending");
   });
 
-  it("edits the rule: Save sends the trimmed text, blank is blocked, Cancel restores", async () => {
+  it("edits the rule in place: a click on it opens the editor; Save sends the trimmed text, blank is blocked, Cancel restores", async () => {
     const { onSaveRule } = renderCard(candidate());
-    fireEvent.click(screen.getByRole("button", { name: "Edit rule" }));
+    fireEvent.click(editRule());
     const box = screen.getByRole("textbox", { name: "Rule text" });
     fireEvent.change(box, { target: { value: "   " } });
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
@@ -92,47 +100,43 @@ describe("ConventionCard", () => {
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "Rule text" })).toBeNull());
     expect(onSaveRule).toHaveBeenCalledWith("Services throw NotFoundError.");
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit rule" }));
+    fireEvent.click(editRule());
     fireEvent.change(screen.getByRole("textbox", { name: "Rule text" }), { target: { value: "changed" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByText("Throw NotFoundError from services when an entity is missing.")).toBeInTheDocument();
     expect(onSaveRule).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the Include in skill checkbox only when the parent passes a selection", () => {
+  it("the keyboard works in the editor: Ctrl+Enter saves, Escape cancels", async () => {
+    const { onSaveRule } = renderCard(candidate());
+    fireEvent.click(editRule());
+    fireEvent.change(screen.getByRole("textbox", { name: "Rule text" }), { target: { value: "New rule." } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Rule text" }), { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(onSaveRule).toHaveBeenCalledWith("New rule."));
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Rule text" })).toBeNull());
+
+    fireEvent.click(editRule());
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Rule text" }), { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: "Rule text" })).toBeNull();
+    expect(onSaveRule).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies the snippet and says so", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderCard(candidate());
+    fireEvent.click(screen.getByRole("button", { name: "Copy snippet" }));
+    expect(writeText).toHaveBeenCalledWith(candidate().evidence_snippet);
+    expect(await screen.findByText("Snippet copied")).toBeInTheDocument();
+  });
+
+  it("has no per-card skill selection: the accepted set is the skill", () => {
     renderCard(candidate({ status: "accepted", accepted: true }));
     expect(screen.queryByRole("checkbox")).toBeNull();
-    cleanup();
-
-    const onChange = vi.fn();
-    render(
-      <NextIntlClientProvider locale="en" messages={{ conventions }}>
-        <ConventionCard
-          candidate={candidate({ status: "accepted", accepted: true })}
-          repo={REPO}
-          onSetStatus={vi.fn()}
-          onSaveRule={vi.fn()}
-          selection={{ checked: true, onChange }}
-        />
-      </NextIntlClientProvider>,
-    );
-    const box = screen.getByRole("checkbox", { name: "Include in skill" });
-    expect(box).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(box);
-    expect(onChange).toHaveBeenCalledWith(false);
   });
 
   it("renders a snippet as text, never as HTML", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="en" messages={{ conventions }}>
-        <ConventionCard
-          candidate={candidate({ evidence_snippet: '<img src=x onerror="alert(1)">' })}
-          repo={REPO}
-          onSetStatus={vi.fn()}
-          onSaveRule={vi.fn()}
-        />
-      </NextIntlClientProvider>,
-    );
+    const { container } = renderCard(candidate({ evidence_snippet: '<img src=x onerror="alert(1)">' }));
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText('<img src=x onerror="alert(1)">')).toBeInTheDocument();
   });
