@@ -1,7 +1,13 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import type { Provider, Review, RunTrace, TraceSkill, UnifiedDiff } from '@devdigest/shared';
+import {
+  reviewPullRequest,
+  countBlockers,
+  renderSkillBlock,
+  type SkillBlock,
+} from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
+import { isTrustedSkillSource } from '../../platform/skill-trust.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
@@ -187,6 +193,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills (server/specs/002-skills.md): the agent's ACTIVE skills (link +
+      // skill enabled) in link order. Inside the try, so a DB error fails the
+      // run like any other step. No skills → no section, prompt unchanged.
+      const skills = await this.loadSkills(agent.id, workspaceId, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -207,6 +218,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Active skills — untrusted (imported) ones are wrapped by assemblePrompt.
+        ...(skills.blocks.length > 0 ? { skills: skills.blocks } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -274,6 +287,7 @@ export class ReviewRunExecutor {
           model: agent.model,
           pr: pull.number,
           source: 'local',
+          skills: skills.trace.length > 0 ? skills.trace : null,
         },
         stats: {
           duration_ms: durationMs,
@@ -283,7 +297,7 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: { ...outcome.assembly, skills_tokens: skills.tokens },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -327,6 +341,41 @@ export class ReviewRunExecutor {
       this.container.runBus.complete(runId);
       throw err;
     }
+  }
+
+  /**
+   * Resolve the agent's active skills into prompt blocks + their trace record.
+   * Tokens are counted with the server tokenizer on the exact rendered text:
+   * per skill (renderSkillBlock) and for the whole block (the same join
+   * assemblePrompt puts under `## Skills / rules`). Logs one line only when the
+   * agent has at least one active skill.
+   */
+  private async loadSkills(
+    agentId: string,
+    workspaceId: string,
+    runLog: RunLogger,
+  ): Promise<{ blocks: SkillBlock[]; trace: TraceSkill[]; tokens: number | null }> {
+    const rows = await this.agents.activeSkillsForAgent(agentId, workspaceId);
+    if (rows.length === 0) return { blocks: [], trace: [], tokens: null };
+
+    const tokenizer = this.container.tokenizer;
+    const blocks: SkillBlock[] = rows.map((r) => ({
+      name: r.name,
+      description: r.description,
+      body: r.body,
+      trusted: isTrustedSkillSource(r.source),
+    }));
+    const rendered = blocks.map(renderSkillBlock);
+    const trace: TraceSkill[] = rows.map((r, i) => ({
+      id: r.id,
+      name: r.name,
+      version: r.version,
+      trusted: blocks[i]!.trusted,
+      tokens: tokenizer.count(rendered[i]!),
+    }));
+    const tokens = tokenizer.count(rendered.join('\n\n'));
+    runLog.info(`Loaded ${rows.length} skill(s) (${tokens} tokens)`);
+    return { blocks, trace, tokens };
   }
 
   /**

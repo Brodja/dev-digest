@@ -115,8 +115,22 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+// imported_file = uploaded .md / skill archive (server/specs/002-skills.md).
+export const SkillSource = z.enum([
+  'manual',
+  'imported_url',
+  'imported_file',
+  'extracted',
+  'community',
+]);
 export type SkillSource = z.infer<typeof SkillSource>;
+
+// Trust is DERIVED from the source, never stored or sent by a client: a skill
+// the user wrote (manual) or the product extracted from the repo (extracted) is
+// trusted; everything imported from outside is untrusted and is
+// delimiter-wrapped in the prompt.
+export const TrustedSkillSource = SkillSource.extract(['manual', 'extracted']);
+export type TrustedSkillSource = z.infer<typeof TrustedSkillSource>;
 
 export const Skill = z.object({
   id: z.string(),
@@ -128,8 +142,44 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Derived from `source` (TrustedSkillSource); false → wrapped as untrusted in the prompt. */
+  trusted: z.boolean(),
 });
 export type Skill = z.infer<typeof Skill>;
+
+/** GET /skills/:id — the skill plus the agents that link it. */
+export const SkillDetail = Skill.extend({
+  used_by: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type SkillDetail = z.infer<typeof SkillDetail>;
+
+/** Why a file of an imported archive was left out (it is never run or stored). */
+export const IgnoredFileReason = z.enum(['script', 'other']);
+export type IgnoredFileReason = z.infer<typeof IgnoredFileReason>;
+
+/**
+ * POST /skills/import/preview — what an upload would become. Nothing is stored
+ * until the user confirms with POST /skills/import.
+ */
+export const SkillImportPreview = z.object({
+  draft: z.object({
+    name: z.string(),
+    description: z.string(),
+    type: SkillType,
+    body: z.string(),
+  }),
+  origin: z.object({
+    filename: z.string(),
+    kind: z.enum(['markdown', 'archive']),
+    /** The file the core came from: the upload itself, or SKILL.md inside the archive. */
+    skill_path: z.string(),
+  }),
+  ignored: z.array(z.object({ path: z.string(), reason: IgnoredFileReason })),
+  warnings: z.array(z.string()),
+  /** The workspace already has a skill with draft.name. */
+  name_taken: z.boolean(),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
 
 export const CommunitySkill = z.object({
   name: z.string(),
@@ -195,6 +245,8 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; the skill reaches the prompt only if this AND Skill.enabled. */
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 

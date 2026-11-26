@@ -28,6 +28,13 @@ export class ValidationError extends AppError {
   }
 }
 
+/** 409 — the request clashes with existing state (e.g. a unique name). */
+export class ConflictError extends AppError {
+  constructor(code = 'conflict', message = 'Conflict', details?: unknown) {
+    super(code, message, 409, details);
+  }
+}
+
 export class ExternalServiceError extends AppError {
   constructor(message: string, details?: unknown) {
     super('external_service_error', message, 502, details);

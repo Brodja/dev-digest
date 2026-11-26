@@ -47,9 +47,24 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
+  /** Tokens of the whole `skills` block (server tokenizer); null when no skill
+      was sent. Nullish: traces stored before skills have no such key. */
+  skills_tokens: z.number().int().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;
+
+/** One skill sent with a run, in prompt order (RunTrace.config.skills). */
+export const TraceSkill = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.number().int(),
+  /** false → the block was wrapped as <untrusted source="skill:…">. */
+  trusted: z.boolean(),
+  /** Tokens of this skill's rendered block. */
+  tokens: z.number().int(),
+});
+export type TraceSkill = z.infer<typeof TraceSkill>;
 
 export const MemoryPulled = z.object({
   pr: z.number().int().nullish(),
@@ -78,6 +93,8 @@ export const RunTrace = z.object({
     model: z.string(),
     pr: z.number().int().nullish(),
     source: z.enum(['local', 'ci']).default('local'),
+    /** Skills sent with this run, in prompt order; null when none (or an old trace). */
+    skills: z.array(TraceSkill).nullish(),
   }),
   stats: RunStats,
   prompt_assembly: PromptAssembly,

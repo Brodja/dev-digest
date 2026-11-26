@@ -42,7 +42,8 @@ A package is checked when one of its non-`.md` files changed. A `reviewer-core` 
 
 | Tag | Path | Effect |
 |-----|------|--------|
-| `migration-edit` | modified or deleted `server/src/db/migrations/**` | CRITICAL (a new generated migration is `migration-new`, fine) |
+| `migration-edit` | a modified or deleted `.sql` or `meta/*_snapshot.json` in `server/src/db/migrations/`; `meta/_journal.json` modified **without** a new `.sql` | CRITICAL |
+| `migration-new` | a new file there, and `meta/_journal.json` modified together with a new `.sql` (`db:generate` appends to it) | none — the normal way to change the schema |
 | `wrong-lockfile` | `package-lock.json` in client/server, `pnpm-lock.yaml` in reviewer-core/e2e | CRITICAL |
 | `secret-file` | `.env*` (not `.example`), `secrets.json` | CRITICAL |
 | `template-skill` | files of the template skills in `.claude/skills/` | WARNING (do-not-touch) |

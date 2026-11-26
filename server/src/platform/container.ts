@@ -1,4 +1,5 @@
 import type {
+  ArchiveReader,
   AuthProvider,
   SecretsProvider,
   GitHubClient,
@@ -6,6 +7,7 @@ import type {
   CodeIndex,
   Embedder,
   LLMProvider,
+  Tokenizer,
 } from '@devdigest/shared';
 import type { AppConfig } from './config.js';
 import type { Db } from '../db/client.js';
@@ -28,7 +30,8 @@ import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
-import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { FflateArchiveReader } from '../adapters/archive/fflate.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -48,9 +51,12 @@ export interface ContainerOverrides {
   llm?: Partial<Record<'openai' | 'anthropic' | 'openrouter', LLMProvider>>;
   /** repo-intel facade (T1.1+) — tests inject mock RepoIntel implementations. */
   repoIntel?: RepoIntel;
-  /** repo-intel T3 adapters — only the indexer pipeline reads these. */
+  /** repo-intel T3 adapter — only the indexer pipeline reads it. */
   depgraph?: DepGraph;
+  /** Token counter: repo-map budget (repo-intel) + skills tokens in the run trace. */
   tokenizer?: Tokenizer;
+  /** In-memory zip reader for skill import. */
+  archive?: ArchiveReader;
 }
 
 export class Container {
@@ -75,6 +81,7 @@ export class Container {
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
+  private _archive?: ArchiveReader;
   private _priceBook?: PriceBook;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
@@ -126,11 +133,18 @@ export class Container {
     return this._depgraph;
   }
 
-  /** Token counter (js-tiktoken) for the repo-map budget search. */
+  /** Token counter (js-tiktoken): repo-map budget search + skills tokens in the run trace. */
   get tokenizer(): Tokenizer {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** In-memory zip reader (fflate) for skill import — never writes to disk. */
+  get archive(): ArchiveReader {
+    if (this.overrides.archive) return this.overrides.archive;
+    this._archive ??= new FflateArchiveReader();
+    return this._archive;
   }
 
   /**

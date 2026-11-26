@@ -12,6 +12,7 @@ import { ThemeProvider } from "./theme";
 import { RepoProvider } from "./repo-context";
 import { ToastProvider, notify } from "./toast";
 import { ApiError } from "./api";
+import { hasLocalErrorToast } from "./mutation-meta";
 
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -39,7 +40,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           },
         }),
         mutationCache: new MutationCache({
-          onError: (err) => notify.error(errorMessage(err)),
+          // A mutation with meta.localErrorToast shows its own toast (with context).
+          onError: (err, _vars, _ctx, mutation) => {
+            if (!hasLocalErrorToast(mutation.meta)) notify.error(errorMessage(err));
+          },
         }),
       })
   );

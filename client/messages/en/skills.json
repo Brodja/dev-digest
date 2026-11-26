@@ -3,99 +3,112 @@
     "crumbLab": "Skills Lab",
     "crumbSkills": "Skills",
     "heading": "Skills",
+    "subtitle": "Review rules your agents add to their prompt. Link a skill to an agent in the agent's Skills tab.",
     "addSkill": "Add Skill",
+    "createSkill": "Create skill",
+    "importSkill": "Import from file",
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
-    "menu": {
-      "fromFile": "Import from file",
-      "fromUrl": "Import from URL",
-      "community": "Search community skills…"
-    },
+    "noMatch": "No skills match “{q}”.",
     "empty": {
       "title": "No skills yet",
-      "body": "Import a skill from a file, a URL, or the community catalog.",
-      "cta": "Import from file"
-    },
-    "selectPrompt": {
-      "title": "Select a skill",
-      "body": "Pick a skill on the left to preview its body."
+      "body": "A skill is a set of review rules in markdown. Create one or import a SKILL.md / skill archive (Add Skill), then link it to an agent.",
+      "cta": "Create skill"
     }
   },
-  "detail": {
-    "crumbSkill": "Skill",
-    "back": "← All skills",
-    "loadError": "Could not load this skill.",
-    "notFound": {
-      "title": "Skill not found",
-      "body": "It may have been deleted."
+  "import": {
+    "title": "Import skill",
+    "subtitle": "From a markdown file or a skill archive",
+    "pickTitle": "Choose a SKILL.md, a .md file or a skill archive (.zip / .skill)",
+    "pickHint": "Up to 1 MB. Only the SKILL.md is used: scripts and other files in an archive are listed, never run or stored. Nothing is saved until you confirm.",
+    "choose": "Choose file",
+    "dropHere": "or drop it here",
+    "fileLabel": "Skill file",
+    "reading": "Reading…",
+    "readFailed": "Could not read the file.",
+    "from": "From",
+    "untrustedNotice": "Imported skills are untrusted: they reach the prompt only as delimited data, and they are saved disabled — turn the skill on after you have read it.",
+    "warnings": "Check before saving",
+    "ignored": "{count, plural, one {# file} other {# files}} ignored — never run or stored",
+    "reason": {
+      "script": "script",
+      "other": "not used"
+    },
+    "preview": "Preview — as the reviewer will read it",
+    "back": "Back",
+    "cancel": "Cancel",
+    "save": "Import skill",
+    "saving": "Importing…",
+    "saved": "Imported “{name}” — disabled until you turn it on",
+    "saveFailed": "Could not import the skill.",
+    "errors": {
+      "unsupported_file": "Upload a .md file or a .zip / .skill archive.",
+      "no_skill_md": "The archive has no SKILL.md.",
+      "multiple_skill_md": "The archive holds several skills — import one at a time.",
+      "too_large": "Too large: the file is limited to 1 MB, SKILL.md to 256 KB unpacked, the body to 40,000 characters.",
+      "too_many_entries": "The archive has too many files (limit: 200).",
+      "not_utf8": "The skill file is not valid UTF-8 text."
     }
   },
-  "drawer": {
-    "title": "Add a skill",
-    "subtitle": "Import from a file, a URL, or search vetted community skills",
-    "tabs": {
-      "file": "From file",
-      "url": "From URL",
-      "community": "Community"
-    },
-    "importFailed": "Import failed"
+  "source": {
+    "manual": "Manual",
+    "imported_url": "Imported (URL)",
+    "imported_file": "Imported (file)",
+    "extracted": "Extracted",
+    "community": "Community"
   },
-  "file": {
-    "nameLabel": "Skill name",
-    "nameHint": "Optional — derived from the first heading if blank.",
-    "namePlaceholder": "pr-quality-rubric",
-    "bodyLabel": "Skill body (Markdown)",
-    "bodyHint": "Pasted content is wrapped as untrusted data — never executed as instructions.",
-    "bodyPlaceholder": "# Rule\nDescribe the rule…",
-    "importing": "Importing…",
-    "import": "Import skill",
-    "success": "Imported \"{name}\" (stored as untrusted data)."
-  },
-  "url": {
-    "label": "Skill URL",
-    "hint": "Fetched server-side, stored as untrusted, and left disabled until vetted.",
-    "placeholder": "https://example.com/skills/security.md",
-    "fetching": "Fetching…",
-    "import": "Import from URL",
-    "success": "Imported \"{name}\". Disabled until you vet + enable it."
-  },
-  "community": {
-    "searchPlaceholder": "Search community skills (e.g. security)…",
-    "allLanguages": "All languages",
-    "loadError": "Could not load community skills",
-    "retry": "Retry",
-    "noMatch": {
-      "title": "No matching skills",
-      "body": "Try a different search term."
-    },
-    "importing": "Importing…",
-    "import": "Import"
-  },
-  "listItem": {
-    "needsVetting": "needs vetting",
-    "vettingTitle": "Untrusted source — vet before enabling",
-    "type": {
-      "rubric": "rubric",
-      "convention": "convention",
-      "security": "security",
-      "custom": "custom"
-    },
-    "source": {
-      "manual": "Manual",
-      "extracted": "Extracted",
-      "community": "Community",
-      "imported_url": "Imported"
-    }
+  "card": {
+    "toggle": "Enable {name} for every agent that links it",
+    "untrusted": "untrusted",
+    "disabled": "disabled",
+    "toggleFailed": "Could not switch “{name}”: {message}"
   },
   "preview": {
-    "untrustedBadge": "untrusted source",
+    "description": "Description",
+    "body": "Skill body",
+    "usedBy": "Used by",
+    "usedByNone": "Not linked to any agent yet.",
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "save": "Save",
+    "version": "v{version}",
+    "untrustedNotice": "Imported from outside this workspace. It reaches the prompt only as untrusted data: the model may apply its criteria, but it cannot change the reviewer's role, output or findings.",
     "edit": "Edit",
-    "untrustedNotice": "This skill came from an untrusted source. Its body is stored as data (delimiter-wrapped) and must be vetted before it is enabled for an agent.",
-    "bodyLabel": "Skill body (Markdown)",
-    "bodyHint": "Saving a changed body creates a new immutable version.",
-    "version": "v{version}"
+    "delete": "Delete",
+    "deleteConfirm": "Delete skill “{name}”? It is removed from all agents. This can't be undone.",
+    "deleted": "Skill “{name}” deleted",
+    "deleteFailed": "Could not delete “{name}”: {message}",
+    "loadError": "Could not load this skill."
+  },
+  "editor": {
+    "createTitle": "Create skill",
+    "editTitle": "Edit skill",
+    "name": "Name",
+    "nameHint": "kebab-case: a–z, 0–9 and “-”, up to 64 characters. Shown in the run trace.",
+    "namePlaceholder": "secret-leakage-gate",
+    "description": "Description",
+    "descriptionHint": "Write it as a directive — what the reviewer must do, e.g. “Flag any hard-coded secret, token or private key added in the diff.” It is sent to the model as the first line of the skill.",
+    "descriptionPlaceholder": "Flag any …",
+    "type": "Type",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this skill is added to the prompts of the agents that link it.",
+    "body": "Skill body",
+    "bodyHint": "Markdown rules, sent to the model right after the description.",
+    "bodyPlaceholder": "- Treat …",
+    "tokens": "≈ {count, number} tokens",
+    "save": "Save skill",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "created": "Skill “{name}” created",
+    "saved": "Skill saved (v{version})",
+    "saveFailed": "Could not save the skill.",
+    "errors": {
+      "nameRequired": "Name is required.",
+      "nameFormat": "Use a kebab-case slug: a–z, 0–9 and “-”, starting with a letter or digit, up to 64 characters.",
+      "nameTaken": "A skill with this name already exists.",
+      "descriptionRequired": "Description is required.",
+      "descriptionTooLong": "Keep the description under {max, number} characters.",
+      "bodyRequired": "Body is required.",
+      "bodyTooLong": "Keep the body under {max, number} characters."
+    }
   }
 }

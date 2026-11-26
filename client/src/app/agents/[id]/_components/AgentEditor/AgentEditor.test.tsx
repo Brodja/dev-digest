@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { Agent } from "@devdigest/shared";
 import messages from "../../../../../../messages/en/agents.json";
@@ -9,7 +9,30 @@ import { ToastProvider } from "../../../../../lib/toast";
 vi.mock("../../../../../lib/hooks/agents", () => ({
   useUpdateAgent: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, data: undefined }),
   useProviderModels: () => ({ data: [{ id: "gpt-4.1", provider: "openai" }] }),
+  useAgentSkills: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useSetAgentSkills: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock("../../../../../lib/hooks/skills", () => ({
+  useSkills: () => ({
+    data: [
+      {
+        id: "s1",
+        name: "secret-leakage-gate",
+        description: "d",
+        type: "security",
+        source: "manual",
+        body: "b",
+        enabled: true,
+        version: 1,
+        trusted: true,
+      },
+    ],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import { AgentEditor } from "./AgentEditor";
 
@@ -44,5 +67,27 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Config")).toBeInTheDocument();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Save agent")).toBeInTheDocument();
+  });
+
+  it("has a Skills tab; switching tabs keeps unsaved Config edits", () => {
+    const ui = (tab: string) => (
+      <NextIntlClientProvider locale="en" messages={{ agents: messages }}>
+        <ToastProvider>
+          <AgentEditor agent={AGENT} tab={tab} onTab={() => {}} />
+        </ToastProvider>
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(ui("config"));
+    expect(screen.getByText("Skills")).toBeInTheDocument(); // tab label
+    const name = screen.getByDisplayValue("Security Reviewer");
+    fireEvent.change(name, { target: { value: "Renamed, not saved" } });
+
+    rerender(ui("skills"));
+    expect(screen.getByText(/Order matters/)).toBeInTheDocument();
+    expect(screen.getByText("Configuration").closest("[aria-hidden='true']")).not.toBeNull();
+
+    rerender(ui("config"));
+    expect(screen.queryByText(/Order matters/)).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Renamed, not saved")).toBeInTheDocument();
   });
 });

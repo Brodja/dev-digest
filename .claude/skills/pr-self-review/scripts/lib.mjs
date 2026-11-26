@@ -44,11 +44,36 @@ export function packageOf(p) {
   return ['client', 'server', 'reviewer-core', 'e2e'].includes(top) && !/\.mdx?$/i.test(p) ? top : null;
 }
 
+const MIGRATIONS_DIR = /^server\/src\/db\/migrations\//;
+const MIGRATION_SQL = /^server\/src\/db\/migrations\/[^/]+\.sql$/;
+export const MIGRATION_JOURNAL = 'server/src/db/migrations/meta/_journal.json';
+const isNew = (status) => status === 'A' || status === '?';
+
+/**
+ * A file under server/src/db/migrations/: a new file is `migration-new`; a changed
+ * or deleted .sql / snapshot is `migration-edit`. The journal is `migration-edit`
+ * here and becomes `migration-new` in reconcileMigrationTags when a new .sql comes
+ * with it (db:generate appends to _journal.json for every migration it writes).
+ */
+export function migrationTagOf(p, status) {
+  if (!MIGRATIONS_DIR.test(p)) return null;
+  return isNew(status) ? 'migration-new' : 'migration-edit';
+}
+
+/** The journal change is generated, not an edit, when the same change adds a migration .sql. */
+export function reconcileMigrationTags(files) {
+  const journal = files.find((f) => f.path === MIGRATION_JOURNAL);
+  if (!journal || isNew(journal.status) || journal.status === 'D') return;
+  const addsSql = files.some((f) => MIGRATION_SQL.test(f.path) && isNew(f.status));
+  if (addsSql) journal.tags = journal.tags.map((t) => (t === 'migration-edit' ? 'migration-new' : t));
+}
+
 /** Tags drive extra skills and the deterministic flags (see routing.md). */
 export function tagsOf(p, status) {
   const t = [];
   const base = path.posix.basename(p);
-  if (/^server\/src\/db\/migrations\//.test(p)) t.push(status === 'A' || status === '?' ? 'migration-new' : 'migration-edit');
+  const migration = migrationTagOf(p, status);
+  if (migration) t.push(migration);
   if (/^(client|server)\/package-lock\.json$/.test(p) || /^(reviewer-core|e2e)\/pnpm-lock\.yaml$/.test(p)) t.push('wrong-lockfile');
   else if (/(^|\/)(pnpm-lock\.yaml|package-lock\.json)$/.test(p)) t.push('lockfile');
   if ((/^\.env(\..+)?$/.test(base) && !/\.example$/.test(base)) || base === 'secrets.json') t.push('secret-file');
@@ -138,7 +163,9 @@ export function collectChanges(baseSha) {
       f.added = ranges[f.path] ?? [];
     }
   }
-  return { root, files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)) };
+  const list = [...files.values()].sort((a, b) => a.path.localeCompare(b.path));
+  reconcileMigrationTags(list);
+  return { root, files: list };
 }
 
 export const lineIsAdded = (file, line) => !!file && file.added.some(([s, e]) => line >= s && line <= e);

@@ -16,7 +16,7 @@ const pkg = (names) => `(^|node_modules/)(${names.join('|')})(/|$)`;
 const SDKS = [
   'fastify', '@fastify/[^/]+', 'fastify-[^/]+', 'drizzle-orm', 'postgres', 'octokit',
   'simple-git', '@vscode/ripgrep', '@ast-grep/napi', 'js-tiktoken', 'dependency-cruiser',
-  '@anthropic-ai/sdk',
+  '@anthropic-ai/sdk', 'fflate',
 ];
 const LLM_SDK = ['openai'];
 const NODE_IO = '^(node:)?(fs|child_process|net|http|https)(/|$)';
