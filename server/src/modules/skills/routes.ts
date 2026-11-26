@@ -17,6 +17,9 @@ import { IMPORT_BODY_LIMIT_BYTES } from './constants.js';
  *   DELETE /skills/:id   → delete (links + versions cascade)
  *   POST   /skills/import/preview → upload (.md / .zip / .skill, base64) → draft; writes nothing
  *   POST   /skills/import → save the confirmed draft (source = imported_file, disabled)
+ *   GET    /skills/:id/versions → body history, newest first (client/specs/004)
+ *   POST   /skills/:id/restore  → { version } → that body becomes the next version
+ *   GET    /skills/:id/stats    → agents that link it + version count
  * Linking skills to an agent lives in the agents module (/agents/:id/skills).
  */
 
@@ -44,6 +47,10 @@ const UpdateSkillBody = z.object({
   type: SkillType.optional(),
   body: SkillBody.optional(),
   enabled: z.boolean().optional(),
+});
+
+const RestoreBody = z.object({
+  version: z.number().int().positive(),
 });
 
 export default async function skillsRoutes(appBase: FastifyInstance) {
@@ -101,5 +108,24 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     const ok = await service.delete(workspaceId, req.params.id);
     if (!ok) throw new NotFoundError('Skill not found');
     return { ok: true };
+  });
+
+  app.get('/skills/:id/versions', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.listVersions(workspaceId, req.params.id);
+  });
+
+  app.post(
+    '/skills/:id/restore',
+    { schema: { params: IdParams, body: RestoreBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      return service.restore(workspaceId, req.params.id, req.body.version);
+    },
+  );
+
+  app.get('/skills/:id/stats', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.stats(workspaceId, req.params.id);
   });
 }

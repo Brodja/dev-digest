@@ -4,11 +4,20 @@ import type {
   SkillDetail,
   SkillImportPreview,
   SkillSource,
+  SkillStats,
   SkillType,
+  SkillVersion,
 } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
+import { NotFoundError } from '../../platform/errors.js';
 import { SkillsRepository } from './repository.js';
-import { skillNameTakenError, toSkillDetailDto, toSkillDto } from './helpers.js';
+import {
+  skillNameTakenError,
+  toSkillDetailDto,
+  toSkillDto,
+  toSkillStatsDto,
+  toSkillVersionDto,
+} from './helpers.js';
 import {
   IMPORT_MAX_BASE64_CHARS,
   IMPORT_MAX_ENTRIES,
@@ -105,6 +114,39 @@ export class SkillsService {
 
   async delete(workspaceId: string, id: string): Promise<boolean> {
     return this.repo.deleteById(workspaceId, id);
+  }
+
+  /** Body history, newest first (client/specs/004-skills-lab-design.md). */
+  async listVersions(workspaceId: string, id: string): Promise<SkillVersion[]> {
+    await this.requireSkill(workspaceId, id);
+    const rows = await this.repo.listVersions(id);
+    return rows.map(toSkillVersionDto);
+  }
+
+  /** Bring an old body back as the next version (same body as now → unchanged). */
+  async restore(workspaceId: string, id: string, version: number): Promise<Skill> {
+    const result = await this.repo.restoreVersion(workspaceId, id, version);
+    if (result.status === 'skill_not_found') throw new NotFoundError('Skill not found');
+    if (result.status === 'version_not_found') {
+      throw new NotFoundError(`Skill version ${version} not found`, { version });
+    }
+    return toSkillDto(result.row);
+  }
+
+  /** Which agents link the skill, and how many body versions it has. */
+  async stats(workspaceId: string, id: string): Promise<SkillStats> {
+    const skill = await this.requireSkill(workspaceId, id);
+    const [versionCount, usage] = await Promise.all([
+      this.repo.countVersions(id),
+      this.repo.usage(workspaceId, id),
+    ]);
+    return toSkillStatsDto(skill, versionCount, usage);
+  }
+
+  private async requireSkill(workspaceId: string, id: string) {
+    const row = await this.repo.getById(workspaceId, id);
+    if (!row) throw new NotFoundError('Skill not found');
+    return row;
   }
 
   /**

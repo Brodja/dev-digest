@@ -73,7 +73,7 @@ flowchart TB
   end
   subgraph Agents["Agents & skills"]
     agents["agents<br/>/agents · /agents/:id · /agents/:id/skills (GET · PUT · POST)"]
-    skills["skills<br/>/skills · /skills/:id · /skills/import/preview · /skills/import"]
+    skills["skills<br/>/skills · /skills/:id · /skills/import/preview · /skills/import<br/>/skills/:id/versions · /skills/:id/restore · /skills/:id/stats"]
     conventions["conventions<br/>/repos/:id/conventions · /extract · /:conventionId (PATCH) · /skill"]
   end
   subgraph Intel["Repo intelligence"]

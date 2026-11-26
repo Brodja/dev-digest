@@ -153,6 +153,40 @@ export const SkillDetail = Skill.extend({
 });
 export type SkillDetail = z.infer<typeof SkillDetail>;
 
+/** GET /skills/:id/versions — one body snapshot; every body change adds one
+    (client/specs/004-skills-lab-design.md). Name, description and type are not versioned. */
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int().positive(),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/** One agent that links a skill (GET /skills/:id/stats). */
+export const SkillUsage = z.object({
+  agent_id: z.string(),
+  agent_name: z.string(),
+  agent_enabled: z.boolean(),
+  link_enabled: z.boolean(),
+  /** 1-based place of this skill among the agent's links, in link (prompt) order. */
+  position: z.number().int().positive(),
+  /** link_enabled && skill.enabled — the rule a review run uses to send the skill. */
+  in_prompt: z.boolean(),
+});
+export type SkillUsage = z.infer<typeof SkillUsage>;
+
+/** GET /skills/:id/stats — who uses the skill, and how many body versions it has. */
+export const SkillStats = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  version_count: z.number().int(),
+  used_by_count: z.number().int(),
+  in_prompt_count: z.number().int(),
+  agents: z.array(SkillUsage),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
+
 /** Why a file of an imported archive was left out (it is never run or stored). */
 export const IgnoredFileReason = z.enum(['script', 'other']);
 export type IgnoredFileReason = z.infer<typeof IgnoredFileReason>;
