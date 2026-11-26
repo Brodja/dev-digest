@@ -39,6 +39,7 @@ const CreateConventionSkillBody = z.object({
     .min(1)
     .max(SKILL_IDS_MAX)
     .refine((ids) => new Set(ids).size === ids.length, 'convention_ids must be unique'),
+  enabled: z.boolean().optional(),
 });
 
 export default async function conventionsRoutes(appBase: FastifyInstance) {

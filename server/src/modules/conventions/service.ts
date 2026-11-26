@@ -65,6 +65,8 @@ export interface ConventionSkillInput {
   description: string;
   body: string;
   convention_ids: string[];
+  /** Whether the new skill starts enabled; omitted → enabled (client/specs/004). */
+  enabled?: boolean;
 }
 
 /** What a scan learned so far — stored on the scan row, also when it fails. */
@@ -184,7 +186,13 @@ export class ConventionsService {
     }
     return this.container.skills.create(
       workspaceId,
-      { name: input.name, description: input.description, type: 'convention', body: input.body, enabled: true },
+      {
+        name: input.name,
+        description: input.description,
+        type: 'convention',
+        body: input.body,
+        enabled: input.enabled ?? true,
+      },
       'extracted',
     );
   }

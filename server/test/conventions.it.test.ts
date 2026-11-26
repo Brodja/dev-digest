@@ -298,11 +298,11 @@ d('conventions extractor (Testcontainers pg)', () => {
     await patch(app, repo.id, strict.id, { status: 'rejected' });
 
     const body = `# repo-conventions\n\nFlag changes that break these rules.\n\n- ${NOT_FOUND_RULE} (\`${SERVICE_PATH}:L8-L9\`)\n- ${PLUGIN_RULE} (\`${ROUTES_PATH}:L5\`)`;
-    const skillReq = (ids: string[], name = 'repo-conventions') =>
+    const skillReq = (ids: string[], name = 'repo-conventions', extra: Record<string, unknown> = {}) =>
       app.inject({
         method: 'POST',
         url: `/repos/${repo.id}/conventions/skill`,
-        payload: { name, description: 'Flag changes that break the house conventions.', body, convention_ids: ids },
+        payload: { name, description: 'Flag changes that break the house conventions.', body, convention_ids: ids, ...extra },
       });
 
     // A rejected or unknown id is refused.
@@ -316,6 +316,12 @@ d('conventions extractor (Testcontainers pg)', () => {
     const skill = created.json() as Skill;
     expect(skill).toMatchObject({ name: 'repo-conventions', type: 'convention', source: 'extracted', trusted: true, enabled: true, version: 1 });
     expect((await skillReq([nf.id], 'repo-conventions')).json().error.code).toBe('skill_name_taken');
+
+    // `enabled` is optional (client/specs/004): false → the skill starts disabled; not a boolean → 422.
+    const off = await skillReq([plugin.id], 'repo-conventions-2', { enabled: false });
+    expect(off.statusCode, off.body).toBe(201);
+    expect(off.json()).toMatchObject({ name: 'repo-conventions-2', enabled: false, source: 'extracted', type: 'convention' });
+    expect((await skillReq([plugin.id], 'repo-conventions-3', { enabled: 'no' })).statusCode).toBe(422);
 
     // Link to an agent, run a review: the skill is in the prompt (not wrapped) and in the trace.
     const agent = (
