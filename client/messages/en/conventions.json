@@ -19,6 +19,7 @@
     "scanSummary": "{files, plural, one {# sampled file} other {# sampled files}} · last scan {when}",
     "droppedSummary": "{count, plural, one {# proposal dropped} other {# proposals dropped}} without evidence",
     "nothingGrounded": "The last scan found no convention it could back with evidence from the code. Re-scan to try again.",
+    "selected": "{selected} of {accepted} accepted selected for the skill",
     "sections": {
       "pending": "To review",
       "accepted": "Accepted",
@@ -47,7 +48,8 @@
     "editLabel": "Rule text",
     "save": "Save",
     "cancel": "Cancel",
-    "evidenceLink": "Open {file} on GitHub at these lines"
+    "evidenceLink": "Open {file} on GitHub at these lines",
+    "include": "Include in skill"
   },
   "modal": {
     "title": "Create skill from conventions",

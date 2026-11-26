@@ -58,4 +58,5 @@ export const s = {
   confBar: { width: 90 } satisfies CSSProperties,
   confValue: { fontSize: 11, color: "var(--text-secondary)" } satisfies CSSProperties,
   actions: { display: "flex", flexDirection: "column", gap: 7, flexShrink: 0, width: 150 } satisfies CSSProperties,
+  include: { marginTop: 4, fontSize: 12 } satisfies CSSProperties,
 } as const;

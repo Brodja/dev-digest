@@ -286,7 +286,12 @@ Placement follows `frontend-architecture`; strings go through next-intl.
   - Header "Conventions in `<repo>`"; subtitle from the scan: `candidateCount` · N sampled files · last scan (relative
     time) · M dropped without evidence.
   - Actions: **Re-scan** (`Run extraction` before the first scan; "Scanning…" and disabled while running) and
-    **Accept as Skill** (`card.acceptAsSkill`; disabled until something is accepted) → opens the modal.
+    **Accept as Skill** (`card.acceptAsSkill`; disabled until at least one accepted convention is selected) → opens the
+    modal with the **selected** accepted conventions; next to it "N of M accepted selected for the skill" (P3).
+  - P3 selection: every accepted card has an **Include in skill** checkbox, all checked by default, so leaving them
+    alone keeps the main flow (all accepted → `repo-conventions`). Unchecking leaves a convention out of the next skill;
+    a second skill is built the same way from another subset, under another name (the modal proposes a free one).
+    The selection is page state only (not stored); the server checks every id is an accepted convention of the repo.
   - States: loading skeleton; load error → `ErrorState` with retry (`page.loadError`); no scan yet → `EmptyState` with
     *Run extraction*; latest scan failed (or this session's request failed) → an alert banner `extractionFailed` with
     the page's own text for `repo_not_indexed`, `repo_intel_disabled`, `repo_not_cloned`, `repo_changed`,

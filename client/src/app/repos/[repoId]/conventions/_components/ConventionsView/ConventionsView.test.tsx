@@ -23,13 +23,15 @@ let query: { data?: ConventionsState; isLoading: boolean; isError: boolean };
 const refetch = vi.fn();
 const extract = { mutate: vi.fn(), isPending: false, isError: false, error: null as Error | null };
 const update = { mutate: vi.fn(), mutateAsync: vi.fn(async () => ({})) };
+const create = { mutate: vi.fn(), isPending: false };
 vi.mock("@/lib/hooks/conventions", () => ({
   useConventions: () => ({ ...query, refetch }),
   useExtractConventions: () => extract,
   useUpdateConvention: () => update,
-  useCreateConventionSkill: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateConventionSkill: () => create,
 }));
-vi.mock("@/lib/hooks/skills", () => ({ useSkills: () => ({ data: [] }) }));
+let existingSkills: { name: string }[] = [];
+vi.mock("@/lib/hooks/skills", () => ({ useSkills: () => ({ data: existingSkills }) }));
 
 import { ConventionsView } from "./ConventionsView";
 
@@ -78,7 +80,9 @@ beforeEach(() => {
   Object.assign(extract, { isPending: false, isError: false, error: null });
   extract.mutate.mockReset();
   update.mutate.mockReset();
+  create.mutate.mockReset();
   refetch.mockReset();
+  existingSkills = [];
 });
 afterEach(cleanup);
 
@@ -143,6 +147,62 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
     expect(body).toContain(ACCEPTED.rule);
     expect(body).not.toContain(PENDING.rule);
     expect(body).not.toContain(REJECTED.rule);
+  });
+
+  describe("several skills from different selections (P3)", () => {
+    const ACCEPTED_2 = cand("a2", "Name files in kebab-case.", "accepted");
+    const bodyOfModal = () => (screen.getByRole("textbox", { name: "Skill body" }) as HTMLTextAreaElement).value;
+    const includeBox = (rule: string) =>
+      within(screen.getByRole("article", { name: rule })).getByRole("checkbox", { name: "Include in skill" });
+
+    beforeEach(() => {
+      query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, ACCEPTED_2, REJECTED] }, isLoading: false, isError: false };
+    });
+
+    it("offers the checkbox on accepted cards only, all selected by default (main flow unchanged)", () => {
+      renderView();
+      expect(includeBox(ACCEPTED.rule)).toHaveAttribute("aria-checked", "true");
+      expect(includeBox(ACCEPTED_2.rule)).toHaveAttribute("aria-checked", "true");
+      expect(within(screen.getByRole("article", { name: PENDING.rule })).queryByRole("checkbox")).toBeNull();
+      expect(within(screen.getByRole("article", { name: REJECTED.rule })).queryByRole("checkbox")).toBeNull();
+      expect(screen.getByText("2 of 2 accepted selected for the skill")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("repo-conventions");
+      expect(bodyOfModal()).toContain(ACCEPTED.rule);
+      expect(bodyOfModal()).toContain(ACCEPTED_2.rule);
+    });
+
+    it("builds the skill from the selected subset only, and a second skill from another subset", () => {
+      renderView();
+      fireEvent.click(includeBox(ACCEPTED_2.rule));
+      expect(screen.getByText("1 of 2 accepted selected for the skill")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
+      expect(bodyOfModal()).toContain(ACCEPTED.rule);
+      expect(bodyOfModal()).not.toContain(ACCEPTED_2.rule);
+      fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+      expect(create.mutate.mock.calls[0]![0]).toMatchObject({ name: "repo-conventions", convention_ids: ["a1"] });
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      // Second skill: the other convention, under another name (the first one now exists).
+      existingSkills = [{ name: "repo-conventions" }];
+      fireEvent.click(includeBox(ACCEPTED.rule));
+      fireEvent.click(includeBox(ACCEPTED_2.rule));
+      fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("repo-conventions-2");
+      expect(bodyOfModal()).toContain(ACCEPTED_2.rule);
+      expect(bodyOfModal()).not.toContain(ACCEPTED.rule);
+      fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+      expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["a2"] });
+    });
+
+    it("disables Accept as Skill when nothing is selected", () => {
+      renderView();
+      fireEvent.click(includeBox(ACCEPTED.rule));
+      fireEvent.click(includeBox(ACCEPTED_2.rule));
+      expect(screen.getByText("0 of 2 accepted selected for the skill")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Accept as Skill" })).toBeDisabled();
+    });
   });
 
   it("explains a failed last scan (stored) in the page's words", () => {

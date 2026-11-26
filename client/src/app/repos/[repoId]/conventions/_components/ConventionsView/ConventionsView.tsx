@@ -29,6 +29,16 @@ export function ConventionsView({ repoId }: { repoId: string }) {
   const extract = useExtractConventions(repoId);
   const update = useUpdateConvention(repoId);
   const [creating, setCreating] = React.useState(false);
+  // Accepted conventions left OUT of the next skill. Empty = all accepted go in, so
+  // not touching the checkboxes keeps the main flow: everything → repo-conventions.
+  const [excluded, setExcluded] = React.useState<ReadonlySet<string>>(() => new Set());
+  const include = (id: string, checked: boolean) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (checked) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const repoName = activeRepo?.full_name ?? t("page.repoFallback");
   const crumb = [{ label: t("page.crumbLab") }, { label: t("page.crumbConventions") }];
@@ -45,6 +55,7 @@ export function ConventionsView({ repoId }: { repoId: string }) {
   const candidates = data?.candidates ?? [];
   const groups = groupByStatus(candidates);
   const accepted = groups.accepted;
+  const selected = accepted.filter((c) => !excluded.has(c.id));
   const scanning = extract.isPending;
   const run = () => extract.mutate();
 
@@ -90,6 +101,11 @@ export function ConventionsView({ repoId }: { repoId: string }) {
           </div>
           {scan && (
             <div style={s.actions}>
+              {accepted.length > 0 && (
+                <span style={s.selected}>
+                  {t("page.selected", { selected: selected.length, accepted: accepted.length })}
+                </span>
+              )}
               <Button kind="secondary" size="sm" icon="RefreshCw" loading={scanning} disabled={scanning} onClick={run}>
                 {scanning ? t("page.scanning") : t("page.rescan")}
               </Button>
@@ -97,7 +113,7 @@ export function ConventionsView({ repoId }: { repoId: string }) {
                 kind="primary"
                 size="sm"
                 icon="Sparkles"
-                disabled={accepted.length === 0 || scanning}
+                disabled={selected.length === 0 || scanning}
                 onClick={() => setCreating(true)}
               >
                 {t("card.acceptAsSkill")}
@@ -150,6 +166,11 @@ export function ConventionsView({ repoId }: { repoId: string }) {
                   repo={activeRepo}
                   onSetStatus={(next) => setStatus(c, next)}
                   onSaveRule={(rule) => saveRule(c, rule)}
+                  selection={
+                    c.status === "accepted"
+                      ? { checked: !excluded.has(c.id), onChange: (checked) => include(c.id, checked) }
+                      : undefined
+                  }
                 />
               ))}
             </section>
@@ -161,7 +182,7 @@ export function ConventionsView({ repoId }: { repoId: string }) {
         <CreateConventionSkillModal
           repoId={repoId}
           repoName={repoName}
-          conventions={accepted}
+          conventions={selected}
           onClose={() => setCreating(false)}
         />
       )}

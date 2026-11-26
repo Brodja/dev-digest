@@ -99,6 +99,29 @@ describe("ConventionCard", () => {
     expect(onSaveRule).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the Include in skill checkbox only when the parent passes a selection", () => {
+    renderCard(candidate({ status: "accepted", accepted: true }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    cleanup();
+
+    const onChange = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={{ conventions }}>
+        <ConventionCard
+          candidate={candidate({ status: "accepted", accepted: true })}
+          repo={REPO}
+          onSetStatus={vi.fn()}
+          onSaveRule={vi.fn()}
+          selection={{ checked: true, onChange }}
+        />
+      </NextIntlClientProvider>,
+    );
+    const box = screen.getByRole("checkbox", { name: "Include in skill" });
+    expect(box).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(box);
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
   it("renders a snippet as text, never as HTML", () => {
     const { container } = render(
       <NextIntlClientProvider locale="en" messages={{ conventions }}>

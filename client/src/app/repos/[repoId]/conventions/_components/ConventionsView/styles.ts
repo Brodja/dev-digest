@@ -8,7 +8,8 @@ export const s = {
   h1: { fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" } satisfies CSSProperties,
   repo: { color: "var(--accent-text)" } satisfies CSSProperties,
   subtitle: { fontSize: 13, color: "var(--text-secondary)", marginTop: 3 } satisfies CSSProperties,
-  actions: { display: "flex", gap: 8, flexShrink: 0 } satisfies CSSProperties,
+  actions: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } satisfies CSSProperties,
+  selected: { fontSize: 12, color: "var(--text-muted)", marginRight: 4 } satisfies CSSProperties,
   banner: {
     display: "flex",
     gap: 10,

@@ -1,12 +1,13 @@
 /* ConventionCard — one candidate: the rule (editable), its evidence (file:lines
    linking to GitHub at the commit the evidence was checked against, plus the
    real snippet), confidence, and Accept / Reject (a second click moves the
-   candidate back to review). */
+   candidate back to review). An accepted card can also be included in, or left
+   out of, the next skill (P3: several skills from different selections). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, IconBtn, MonoLink, ProgressBar, Textarea } from "@devdigest/ui";
+import { Button, Checkbox, IconBtn, MonoLink, ProgressBar, Textarea } from "@devdigest/ui";
 import type { ConventionCandidate, ConventionStatus } from "@devdigest/shared";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { lineRef } from "./helpers";
@@ -22,6 +23,7 @@ export function ConventionCard({
   repo,
   onSetStatus,
   onSaveRule,
+  selection,
 }: {
   candidate: ConventionCandidate;
   /** Null until the repos list has loaded: the evidence is shown without a link. */
@@ -29,6 +31,8 @@ export function ConventionCard({
   onSetStatus: (status: ConventionStatus) => void;
   /** Resolves when saved; the card leaves edit mode only then. */
   onSaveRule: (rule: string) => Promise<unknown>;
+  /** Accepted cards only: whether this convention goes into the next skill. */
+  selection?: { checked: boolean; onChange: (checked: boolean) => void };
 }) {
   const t = useTranslations("conventions");
   const [editing, setEditing] = React.useState(false);
@@ -141,6 +145,11 @@ export function ConventionCard({
           <Button kind="ghost" size="sm" icon="X" full onClick={() => onSetStatus("rejected")}>
             {t("card.reject")}
           </Button>
+        )}
+        {selection && (
+          <div style={s.include}>
+            <Checkbox checked={selection.checked} onChange={selection.onChange} label={t("card.include")} />
+          </div>
         )}
       </div>
     </article>
