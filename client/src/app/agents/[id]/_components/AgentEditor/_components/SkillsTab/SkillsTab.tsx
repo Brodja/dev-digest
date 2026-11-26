@@ -1,18 +1,21 @@
-/* SkillsTab — the agent's linked skills (server/specs/002-skills.md): link,
-   enable / disable per agent, unlink, reorder by drag or ↑/↓. The order here is
-   the order of the skill blocks in the prompt. Every change PUTs the full list. */
+/* SkillsTab — every workspace skill in one list (screen_agents.jsx SkillsTab,
+   client/specs/004): the linked ones first, in prompt order, then the rest. The
+   checkbox links / unlinks; linked rows reorder by drag, or by ArrowUp /
+   ArrowDown on the focused grip. The order here is the order of the skill
+   blocks in the prompt. Every change PUTs the full list. */
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Badge, EmptyState, ErrorState, Icon, IconBtn, SearchableSelect, Skeleton, Toggle } from "@devdigest/ui";
+import { Badge, Checkbox, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
+import type { Skill } from "@devdigest/shared";
 import { SkillTypeBadge } from "@/components/SkillTypeBadge";
 import { useAgentSkills, useSetAgentSkills } from "@/lib/hooks/agents";
 import { useSkills } from "@/lib/hooks/skills";
+import { filterSkills } from "@/lib/skill-search";
 import { useToast } from "@/lib/toast";
-import { linkedRows, moveItem, toLinkInputs, type LinkInput } from "./helpers";
+import { moveItem, splitRows, toggleLink, toLinkInputs } from "./helpers";
 import { useDragReorder } from "./hooks";
 import { s } from "./styles";
 
@@ -23,29 +26,33 @@ export function SkillsTab({ agentId }: { agentId: string }) {
   const links = useAgentSkills(agentId);
   const skills = useSkills();
   const setLinks = useSetAgentSkills();
+  const [filter, setFilter] = React.useState("");
 
-  const rows = linkedRows(links.data ?? [], skills.data ?? []);
-  const current = toLinkInputs(rows);
+  const all = skills.data ?? [];
+  const { linked, rest } = splitRows(links.data ?? [], all);
+  const linkedIds = linked.map((sk) => sk.id);
   // The hook already rolled the optimistic change back; say so.
-  const commit = (next: LinkInput[]) =>
+  const commit = (ids: string[]) =>
     setLinks.mutate(
-      { agentId, links: next },
+      { agentId, links: toLinkInputs(ids) },
       { onError: (err) => toast.error(t("skills.saveFailed", { message: (err as Error).message })) },
     );
-  const move = (from: number, to: number) => commit(moveItem(current, from, to));
+  const move = (from: number, to: number) => commit(moveItem(linkedIds, from, to));
   const { dragIndex, overIndex, rowProps } = useDragReorder(move);
 
-  const linkedIds = new Set((links.data ?? []).map((l) => l.skill_id));
-  const unlinked = (skills.data ?? []).filter((sk) => !linkedIds.has(sk.id));
-  // What actually reaches the prompt: link on AND skill on (same rule as the run).
-  const enabledCount = rows.filter((r) => r.enabled && r.skill.enabled).length;
+  // Reordering a filtered list would move rows the user cannot see.
+  const filtering = filter.trim() !== "";
+  const shownLinked = filterSkills(linked, filter);
+  const shownRest = filterSkills(rest, filter);
+  // What reaches the prompt: linked AND switched on on the Skills page (the run's rule).
+  const enabledCount = linked.filter((sk) => sk.enabled).length;
 
   if (links.isLoading || skills.isLoading) {
     return (
       <div style={s.wrap}>
         <Skeleton height={22} width={200} />
-        <Skeleton height={48} style={{ marginTop: 16 }} />
-        <Skeleton height={48} style={{ marginTop: 8 }} />
+        <Skeleton height={44} style={{ marginTop: 16 }} />
+        <Skeleton height={44} style={{ marginTop: 6 }} />
       </div>
     );
   }
@@ -56,7 +63,7 @@ export function SkillsTab({ agentId }: { agentId: string }) {
     };
     return <ErrorState body={t("skills.loadError")} onRetry={retry} />;
   }
-  if ((skills.data ?? []).length === 0) {
+  if (all.length === 0) {
     return (
       <EmptyState
         icon="Sparkles"
@@ -68,97 +75,90 @@ export function SkillsTab({ agentId }: { agentId: string }) {
     );
   }
 
+  const nameAndMarks = (skill: Skill, checked: boolean) => (
+    <>
+      <Checkbox
+        checked={checked}
+        onChange={() => commit(toggleLink(linkedIds, skill.id))}
+        label={
+          <span className="mono" style={s.name}>
+            {skill.name}
+          </span>
+        }
+      />
+      <span style={s.spacer} />
+      <SkillTypeBadge type={skill.type} />
+      {!skill.trusted && (
+        <Badge color="var(--warn)" bg="var(--warn-bg)" icon="Shield">
+          {t("skills.untrusted")}
+        </Badge>
+      )}
+      {!skill.enabled && <span style={s.globalOff}>{t("skills.globallyDisabled")}</span>}
+    </>
+  );
+
   return (
     <div style={s.wrap}>
       <div style={s.header}>
         <h2 style={s.h2}>{t("skills.title")}</h2>
-        <Badge color="var(--accent)" bg="var(--accent-bg)">
-          {t("skills.enabledCount", { enabled: enabledCount, linked: rows.length })}
+        <Badge color="var(--accent-text)" bg="var(--accent-bg)">
+          {t("skills.enabledCount", { enabled: enabledCount, total: all.length })}
         </Badge>
-        <Link href="/skills" style={s.manage}>
-          {t("skills.manage")}
-        </Link>
+        <div style={s.filter}>
+          <Icon.Search size={13} style={s.filterIcon} />
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={t("skills.filterPlaceholder")}
+            aria-label={t("skills.filterPlaceholder")}
+            style={s.filterInput}
+          />
+        </div>
       </div>
       <p style={s.hint}>{t("skills.orderHint")}</p>
 
-      {rows.length === 0 ? (
-        <p style={s.none}>{t("skills.noneLinked")}</p>
-      ) : (
-        <ol style={s.list} aria-label={t("skills.title")}>
-          {rows.map((row, i) => {
-            const { skill } = row;
-            return (
-              <li
-                key={skill.id}
-                data-testid={`skill-row-${skill.name}`}
-                {...rowProps(i)}
-                style={s.row(row.enabled && skill.enabled, dragIndex === i, overIndex === i && dragIndex !== i)}
+      <ol style={s.list} aria-label={t("skills.title")}>
+        {shownLinked.map((skill) => {
+          const i = linkedIds.indexOf(skill.id);
+          return (
+            <li
+              key={skill.id}
+              data-testid={`skill-row-${skill.name}`}
+              {...(filtering ? {} : rowProps(i))}
+              style={s.row(true, dragIndex === i, overIndex === i && dragIndex !== i, !filtering)}
+            >
+              <button
+                type="button"
+                aria-label={t("skills.reorder", { name: skill.name })}
+                title={t("skills.drag")}
+                disabled={filtering}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowUp" && i > 0) {
+                    e.preventDefault();
+                    move(i, i - 1);
+                  } else if (e.key === "ArrowDown" && i < linkedIds.length - 1) {
+                    e.preventDefault();
+                    move(i, i + 1);
+                  }
+                }}
+                style={s.grip(!filtering)}
               >
-                <span title={t("skills.drag")} style={s.grip}>
-                  <Icon.GripVertical size={15} />
-                </span>
-                <span className="mono" style={s.position}>
-                  {i + 1}
-                </span>
-                <span className="mono" style={s.name}>
-                  {skill.name}
-                </span>
-                <SkillTypeBadge type={skill.type} />
-                {!skill.trusted && (
-                  <Badge color="var(--warn)" bg="var(--warn-bg)" icon="Shield">
-                    {t("skills.untrusted")}
-                  </Badge>
-                )}
-                {!skill.enabled && <span style={s.globalOff}>{t("skills.globallyDisabled")}</span>}
-                <span style={s.actions}>
-                  {i > 0 ? (
-                    <IconBtn icon="ArrowUp" size={26} label={t("skills.moveUp", { name: skill.name })} onClick={() => move(i, i - 1)} />
-                  ) : (
-                    <span style={s.btnSpacer} />
-                  )}
-                  {i < rows.length - 1 ? (
-                    <IconBtn
-                      icon="ArrowDown"
-                      size={26}
-                      label={t("skills.moveDown", { name: skill.name })}
-                      onClick={() => move(i, i + 1)}
-                    />
-                  ) : (
-                    <span style={s.btnSpacer} />
-                  )}
-                  <Toggle
-                    on={row.enabled}
-                    size={14}
-                    label={t("skills.toggle", { name: skill.name })}
-                    onChange={(enabled) => commit(current.map((l, j) => (j === i ? { ...l, enabled } : l)))}
-                  />
-                  <IconBtn
-                    icon="X"
-                    size={26}
-                    danger
-                    label={t("skills.unlink", { name: skill.name })}
-                    onClick={() => commit(current.filter((_, j) => j !== i))}
-                  />
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      <div style={s.linkRow}>
-        {unlinked.length === 0 ? (
-          <span style={s.none}>{t("skills.allLinked")}</span>
-        ) : (
-          <SearchableSelect
-            value=""
-            mono
-            placeholder={t("skills.linkPlaceholder")}
-            options={unlinked.map((sk) => ({ value: sk.id, label: sk.name }))}
-            onChange={(id) => id && commit([...current, { skill_id: id, enabled: true }])}
-          />
-        )}
-      </div>
+                <Icon.Menu size={14} />
+              </button>
+              {nameAndMarks(skill, true)}
+            </li>
+          );
+        })}
+        {shownRest.map((skill) => (
+          <li key={skill.id} data-testid={`skill-row-${skill.name}`} style={s.row(false, false, false, false)}>
+            <span aria-hidden="true" style={s.grip(false)}>
+              <Icon.Menu size={14} />
+            </span>
+            {nameAndMarks(skill, false)}
+          </li>
+        ))}
+      </ol>
+      {shownLinked.length + shownRest.length === 0 && <p style={s.none}>{t("skills.noMatch", { q: filter })}</p>}
     </div>
   );
 }

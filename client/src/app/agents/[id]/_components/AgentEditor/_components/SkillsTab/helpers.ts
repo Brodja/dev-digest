@@ -6,12 +6,6 @@ export interface LinkInput {
   enabled: boolean;
 }
 
-/** A linked skill as the tab shows it, in prompt order. */
-export interface LinkedRow {
-  skill: Skill;
-  enabled: boolean;
-}
-
 /** Move the item at `from` to position `to` (pure; out-of-range → unchanged copy). */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
   const next = [...list];
@@ -21,17 +15,37 @@ export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-/** Join the links (ids + order) with the workspace skills; unknown ids are skipped. */
-export function linkedRows(links: readonly AgentSkillLink[], skills: readonly Skill[]): LinkedRow[] {
+/**
+ * The tab's one list (screen_agents.jsx, client/specs/004): the linked skills in
+ * prompt order, then every other workspace skill by name. A link switched off
+ * (enabled = false, from the API or the old tab) never reaches the prompt, so it
+ * shows unchecked among the rest and the next save drops it.
+ */
+export function splitRows(
+  links: readonly AgentSkillLink[],
+  skills: readonly Skill[],
+): { linked: Skill[]; rest: Skill[] } {
   const byId = new Map(skills.map((sk) => [sk.id, sk]));
-  return [...links]
+  const linked = [...links]
+    .filter((l) => l.enabled)
     .sort((a, b) => a.order - b.order)
     .flatMap((l) => {
       const skill = byId.get(l.skill_id);
-      return skill ? [{ skill, enabled: l.enabled }] : [];
+      return skill ? [skill] : [];
     });
+  const linkedIds = new Set(linked.map((sk) => sk.id));
+  const rest = skills
+    .filter((sk) => !linkedIds.has(sk.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { linked, rest };
 }
 
-export function toLinkInputs(rows: readonly LinkedRow[]): LinkInput[] {
-  return rows.map((r) => ({ skill_id: r.skill.id, enabled: r.enabled }));
+/** Check → append at the end of the prompt order; uncheck → unlink. */
+export function toggleLink(linkedIds: readonly string[], skillId: string): string[] {
+  return linkedIds.includes(skillId) ? linkedIds.filter((id) => id !== skillId) : [...linkedIds, skillId];
+}
+
+/** The ordered set PUT sends: every linked skill, enabled. */
+export function toLinkInputs(linkedIds: readonly string[]): LinkInput[] {
+  return linkedIds.map((skill_id) => ({ skill_id, enabled: true }));
 }

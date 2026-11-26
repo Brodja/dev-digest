@@ -43,12 +43,12 @@ const link = (skill_id: string, order: number, enabled = true): AgentSkillLink =
 
 beforeEach(() => {
   skills = [
-    skill("a", { type: "security" }),
+    skill("a", { type: "security", description: "secrets" }),
     skill("b", { source: "imported_file", trusted: false }),
     skill("c", { enabled: false }),
     skill("d"),
   ];
-  // prompt order: c, a, b — d is not linked
+  // prompt order: c, a — b's link is switched off (legacy), d is not linked
   links = [link("a", 1), link("b", 2, false), link("c", 0)];
   setLinks.mockReset();
 });
@@ -69,71 +69,81 @@ const rowNames = () =>
     .getAllByRole("listitem")
     .map((li) => li.getAttribute("data-testid"));
 
+const box = (name: string) => screen.getByRole("checkbox", { name });
 const sent = () => setLinks.mock.calls.at(-1)![0];
+const sentIds = () => sent().links.map((l: { skill_id: string }) => l.skill_id);
 
 describe("Agent editor → Skills tab", () => {
-  it("lists the linked skills in prompt order with their state", () => {
+  it("lists every skill: the linked ones in prompt order, then the rest by name", () => {
     renderTab();
-    expect(rowNames()).toEqual(["skill-row-skill-c", "skill-row-skill-a", "skill-row-skill-b"]);
-    // c: link on but skill off on the Skills page; b: link off → only a is sent.
-    expect(screen.getByText("1 of 3 enabled")).toBeInTheDocument();
-    expect(screen.getByText(/Drag to reorder/)).toBeInTheDocument();
-    const rowB = screen.getByTestId("skill-row-skill-b");
-    expect(within(rowB).getByText("untrusted")).toBeInTheDocument();
-    expect(within(rowB).getByRole("switch")).toHaveAttribute("aria-checked", "false");
-    expect(within(screen.getByTestId("skill-row-skill-c")).getByText(/off on the Skills page/)).toBeInTheDocument();
+    expect(rowNames()).toEqual(["skill-row-skill-c", "skill-row-skill-a", "skill-row-skill-b", "skill-row-skill-d"]);
+    expect(box("skill-c")).toHaveAttribute("aria-checked", "true");
+    expect(box("skill-a")).toHaveAttribute("aria-checked", "true");
+    // A link switched off never reaches the prompt: shown unchecked.
+    expect(box("skill-b")).toHaveAttribute("aria-checked", "false");
+    expect(box("skill-d")).toHaveAttribute("aria-checked", "false");
   });
 
-  it("the per-agent toggle sends the full list with that link switched", () => {
+  it("heads the list with what reaches the prompt out of all skills, the filter and the order hint", () => {
     renderTab();
-    fireEvent.click(screen.getByRole("switch", { name: "Send skill-b in this agent's prompt" }));
+    // a is linked and on; c is linked but off on the Skills page.
+    expect(screen.getByText("1 of 4 enabled")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Filter skills…" })).toBeInTheDocument();
+    expect(screen.getByText(/Order matters .* Drag to reorder\./)).toBeInTheDocument();
+    expect(within(screen.getByTestId("skill-row-skill-b")).getByText("untrusted")).toBeInTheDocument();
+    expect(within(screen.getByTestId("skill-row-skill-c")).getByText(/off on the Skills page/)).toBeInTheDocument();
+    expect(within(screen.getByTestId("skill-row-skill-a")).getByText("security")).toBeInTheDocument();
+  });
+
+  it("checking a skill links it at the end of the prompt order, enabled", () => {
+    renderTab();
+    fireEvent.click(box("skill-d"));
     expect(sent()).toEqual({
       agentId: "ag1",
       links: [
         { skill_id: "c", enabled: true },
         { skill_id: "a", enabled: true },
-        { skill_id: "b", enabled: true },
+        { skill_id: "d", enabled: true },
       ],
     });
   });
 
-  it("↑ / ↓ reorder; the first row has no ↑ and the last no ↓", () => {
+  it("unchecking a skill unlinks it", () => {
     renderTab();
-    expect(screen.queryByRole("button", { name: "Move skill-c up" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Move skill-b down" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Move skill-c down" }));
-    expect(sent().links.map((l: { skill_id: string }) => l.skill_id)).toEqual(["a", "c", "b"]);
-    fireEvent.click(screen.getByRole("button", { name: "Move skill-b up" }));
-    expect(sent().links.map((l: { skill_id: string }) => l.skill_id)).toEqual(["c", "b", "a"]);
+    fireEvent.click(box("skill-a"));
+    expect(sentIds()).toEqual(["c"]);
   });
 
-  it("drag and drop moves a row", () => {
+  it("drag and drop moves a linked row", () => {
     renderTab();
     const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
-    const from = screen.getByTestId("skill-row-skill-b");
+    const from = screen.getByTestId("skill-row-skill-a");
     const to = screen.getByTestId("skill-row-skill-c");
     fireEvent.dragStart(from, { dataTransfer });
     fireEvent.dragOver(to, { dataTransfer });
     fireEvent.drop(to, { dataTransfer });
-    expect(sent().links).toEqual([
-      { skill_id: "b", enabled: false },
-      { skill_id: "c", enabled: true },
-      { skill_id: "a", enabled: true },
-    ]);
+    expect(sentIds()).toEqual(["a", "c"]);
   });
 
-  it("unlinks a skill", () => {
+  it("the arrow keys on a focused grip move the row; the ends stay put", () => {
     renderTab();
-    fireEvent.click(screen.getByRole("button", { name: "Unlink skill-a" }));
-    expect(sent().links.map((l: { skill_id: string }) => l.skill_id)).toEqual(["c", "b"]);
+    const gripC = screen.getByRole("button", { name: /Reorder skill-c/ });
+    fireEvent.keyDown(gripC, { key: "ArrowUp" });
+    expect(setLinks).not.toHaveBeenCalled();
+    fireEvent.keyDown(gripC, { key: "ArrowDown" });
+    expect(sentIds()).toEqual(["a", "c"]);
+    // Unlinked rows have no reorder control.
+    expect(screen.queryByRole("button", { name: /Reorder skill-d/ })).toBeNull();
   });
 
-  it("links an unlinked skill at the end, enabled", () => {
+  it("the filter narrows the list and turns reordering off", () => {
     renderTab();
-    fireEvent.click(screen.getByText("Link a skill…"));
-    fireEvent.click(screen.getByText("skill-d"));
-    expect(sent().links.at(-1)).toEqual({ skill_id: "d", enabled: true });
-    expect(sent().links).toHaveLength(4);
+    fireEvent.change(screen.getByRole("textbox", { name: "Filter skills…" }), { target: { value: "secret" } });
+    expect(rowNames()).toEqual(["skill-row-skill-a"]);
+    expect(screen.getByRole("button", { name: /Reorder skill-a/ })).toBeDisabled();
+    expect(screen.getByTestId("skill-row-skill-a")).not.toHaveAttribute("draggable");
+    fireEvent.change(screen.getByRole("textbox", { name: "Filter skills…" }), { target: { value: "zzz" } });
+    expect(screen.getByText("No skills match “zzz”.")).toBeInTheDocument();
   });
 
   it("says the change was undone when the server refuses it", async () => {
@@ -141,7 +151,7 @@ describe("Agent editor → Skills tab", () => {
       opts.onError?.(new ApiError("Unknown skill for this workspace", 422, "validation_error")),
     );
     renderTab();
-    fireEvent.click(screen.getByRole("switch", { name: "Send skill-a in this agent's prompt" }));
+    fireEvent.click(box("skill-d"));
     expect(
       await screen.findByText("Could not save the skill links — your change was undone. Unknown skill for this workspace"),
     ).toBeInTheDocument();
