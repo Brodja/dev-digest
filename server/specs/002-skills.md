@@ -328,7 +328,8 @@ All 2026-11-26.
 - Memory of accepted / dismissed findings.
 - Running several agents in parallel.
 - Storing a skill's file tree (references, scripts, assets) — only the `SKILL.md` core is kept.
-- Skill versions / evals / stats / context tabs from the design; a diff or restore of versions.
+- Skill evals / context tabs from the design. (Versions with diff and restore, and usage stats, came later in
+  [004](004-skills-lab-design.md).)
 - A skill count on `AgentCard`; a new agent version on link changes.
 - Seeding demo skills (optional, see Part 2).
 

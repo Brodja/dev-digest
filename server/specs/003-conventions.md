@@ -370,6 +370,9 @@ All 2026-11-26.
   candidates — has nowhere to live.
 - **Several skills from one list — via selection** (P3, agreed with the user): the user picks a subset of the accepted
   candidates for each skill. No categories from the model.
+  *Superseded 2026-11-27 by [004](004-skills-lab-design.md):* the accepted set itself is the skill (the design has
+  no selection checkbox); a second skill is built after changing the accepted set. The page is one list of cards, the
+  modal also offers *Enabled* (optional `enabled` in `POST …/skill`, default `true`).
 - **Synchronous extract.** One call to a cheap model; a job queue and polling are not worth it. Timeout 150 s.
 - **Links pin `commit_sha`**, the HEAD read around the scan, so lines stay right after the branch moves on; the default
   branch is the fallback for rows without a sha.
