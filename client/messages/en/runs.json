@@ -44,7 +44,12 @@
     },
     "prompt": {
       "system": "System",
-      "skills": "Skills (dynamic)",
+      "skills": "Skills — enabled skill bodies",
+      "skillsTokens": "{count, number} tokens",
+      "skillTokens": "{count, number} tok",
+      "skillsPerCall": "sent with each of {count} calls",
+      "untrusted": "untrusted",
+      "untrustedSkill": "Imported skill — sent as untrusted data",
       "memory": "Memory (dynamic)",
       "repoMap": "Repo skeleton — repo-intel (dynamic)",
       "specs": "Project context (dynamic)",

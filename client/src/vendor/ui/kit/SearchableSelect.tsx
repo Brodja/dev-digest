@@ -1,5 +1,7 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../icons";
+import { placeMenu, type MenuPlacement } from "./placeMenu";
 
 type SelectOption = string | { value: string; label: string };
 const optValue = (o: SelectOption) => (typeof o === "string" ? o : o.value);
@@ -9,6 +11,10 @@ const optLabel = (o: SelectOption) => (typeof o === "string" ? o : o.label);
  * Searchable single-select — same options API as SelectInput, but with a filter
  * box + keyboard nav, for long lists (e.g. the 300+ OpenRouter models). Filters
  * by value and label; Enter selects, ↑/↓ move, Esc closes.
+ *
+ * The open menu is portaled to <body> with position: fixed, so a scrolling or
+ * overflow-clipping ancestor (editor panes, modals) never cuts it off. It follows
+ * the trigger on scroll / resize and opens upwards when there is no room below.
  */
 export function SearchableSelect({
   value,
@@ -28,16 +34,38 @@ export function SearchableSelect({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [hi, setHi] = React.useState(0);
+  const [place, setPlace] = React.useState<MenuPlacement | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // The menu lives in a portal, outside `ref` — clicks in it are inside.
+      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // Position the fixed menu next to the trigger; keep it there while any
+  // ancestor scrolls (capture) or the window resizes.
+  const reposition = React.useCallback(() => {
+    const el = ref.current;
+    if (el) setPlace(placeMenu(el.getBoundingClientRect(), window.innerHeight, maxHeight));
+  }, [maxHeight]);
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    reposition();
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open, reposition]);
   React.useEffect(() => {
     if (open) {
       setQuery("");
@@ -107,18 +135,23 @@ export function SearchableSelect({
         </span>
         <Icon.ChevronsUpDown size={14} style={{ color: "var(--text-muted)" }} />
       </div>
-      {open && (
+      {open &&
+        place &&
+        createPortal(
         <div
+          ref={menuRef}
+          data-searchable-select-menu=""
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            right: 0,
+            position: "fixed",
+            left: place.left,
+            width: place.width,
+            ...(place.top !== undefined ? { top: place.top } : { bottom: place.bottom }),
             background: "var(--bg-elevated)",
             border: "1px solid var(--border-strong)",
             borderRadius: 9,
             boxShadow: "var(--shadow-modal)",
-            zIndex: 40,
+            // Above Modal / Drawer (50): the select is also used inside them.
+            zIndex: 1000,
             overflow: "hidden",
             animation: "ddpop .12s ease",
           }}
@@ -153,7 +186,7 @@ export function SearchableSelect({
               }}
             />
           </div>
-          <div style={{ maxHeight, overflowY: "auto", padding: 6 }}>
+          <div role="listbox" style={{ maxHeight: place.listMaxHeight, overflowY: "auto", padding: 6 }}>
             {filtered.length === 0 && (
               <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--text-muted)" }}>
                 No matches
@@ -167,6 +200,8 @@ export function SearchableSelect({
                 <button
                   key={v}
                   type="button"
+                  role="option"
+                  aria-selected={sel}
                   onMouseEnter={() => setHi(i)}
                   onClick={() => pick(o)}
                   className={mono ? "mono" : undefined}
@@ -196,8 +231,9 @@ export function SearchableSelect({
               );
             })}
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   );
 }

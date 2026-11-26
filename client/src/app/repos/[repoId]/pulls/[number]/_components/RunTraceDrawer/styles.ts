@@ -66,6 +66,29 @@ export const s = {
   promptDot: (color: string): CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: color }),
   promptLabel: { fontSize: 13, fontWeight: 600 } satisfies CSSProperties,
   promptToggle: { marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  promptMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+    padding: "0 12px 8px 29px",
+    fontSize: 12,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+
+  // ---- SkillsBlock ----
+  skillChip: (trusted: boolean): CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    padding: "1px 7px",
+    borderRadius: 4,
+    border: "1px solid " + (trusted ? "var(--border)" : "var(--warn)"),
+    background: trusted ? "var(--bg-elevated)" : "var(--warn-bg)",
+    fontSize: 11.5,
+  }),
+  skillChipTokens: { color: "var(--text-muted)" } satisfies CSSProperties,
+  skillPerCall: { color: "var(--text-muted)" } satisfies CSSProperties,
   promptPre: {
     margin: 0,
     padding: "12px 14px",

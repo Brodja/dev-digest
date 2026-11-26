@@ -20,7 +20,18 @@ const miniBtnStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-export function PromptBlock({ label, text, color }: { label: string; text: string; color: string }) {
+export function PromptBlock({
+  label,
+  text,
+  color,
+  meta,
+}: {
+  label: string;
+  text: string;
+  color: string;
+  /** Optional always-visible line under the header (e.g. token counts). */
+  meta?: React.ReactNode;
+}) {
   const t = useTranslations("runs");
   const [open, setOpen] = React.useState(false);
   const [full, setFull] = React.useState(false);
@@ -65,6 +76,7 @@ export function PromptBlock({ label, text, color }: { label: string; text: strin
           </span>
         </span>
       </div>
+      {meta && <div style={s.promptMeta}>{meta}</div>}
       {open && (
         <pre className="mono" style={s.promptPre}>
           {text || "—"}

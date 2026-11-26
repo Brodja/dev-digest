@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -76,6 +76,53 @@ export function useDeleteAgent() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       qc.removeQueries({ queryKey: ["agent", id] });
+    },
+  });
+}
+
+/** The agent's linked skills, in prompt order (ids + per-agent `enabled`). */
+export function useAgentSkills(agentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-skills", agentId],
+    queryFn: () => api.get<AgentSkillLink[]>(`/agents/${agentId}/skills`),
+    enabled: !!agentId,
+  });
+}
+
+export interface SetAgentSkillsInput {
+  agentId: string;
+  /** The whole ordered set; array order = order of the blocks in the prompt. */
+  links: { skill_id: string; enabled: boolean }[];
+}
+
+/**
+ * Replace the agent's skill set (PUT). Optimistic: the Skills tab reorders /
+ * toggles instantly and rolls back if the server refuses.
+ */
+export function useSetAgentSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, links }: SetAgentSkillsInput) =>
+      api.put<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
+    onMutate: async ({ agentId, links }) => {
+      const key = ["agent-skills", agentId];
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<AgentSkillLink[]>(key);
+      qc.setQueryData<AgentSkillLink[]>(
+        key,
+        links.map((l, order) => ({ agent_id: agentId, skill_id: l.skill_id, enabled: l.enabled, order })),
+      );
+      return { previous };
+    },
+    onError: (_err, { agentId }, ctx) => {
+      qc.setQueryData(["agent-skills", agentId], ctx?.previous);
+    },
+    onSuccess: (data, { agentId }) => {
+      qc.setQueryData(["agent-skills", agentId], data);
+    },
+    onSettled: () => {
+      // A skill's "used by" list depends on its links.
+      qc.invalidateQueries({ queryKey: ["skill"] });
     },
   });
 }

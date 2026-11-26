@@ -77,3 +77,56 @@ describe("Run Trace drawer — COST stat", () => {
     expect(screen.getByTestId("run-cost")).toHaveTextContent("—");
   });
 });
+
+describe("Run Trace drawer — skills block in Prompt assembly", () => {
+  const openPromptAssembly = () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Prompt assembly"));
+  };
+
+  it("shows the block, the tokens it added and each skill sent, untrusted marked", () => {
+    currentTrace = {
+      ...TRACE,
+      config: {
+        ...TRACE.config,
+        skills: [
+          { id: "s2", name: "owasp-top10", version: 1, trusted: false, tokens: 40 },
+          { id: "s1", name: "l02-secrets-gate", version: 3, trusted: true, tokens: 52 },
+        ],
+      },
+      prompt_assembly: { ...TRACE.prompt_assembly, skills: "### owasp-top10 …", skills_tokens: 94 },
+    };
+    openPromptAssembly();
+    expect(screen.getByText("Skills — enabled skill bodies")).toBeInTheDocument();
+    expect(screen.getByText("94 tokens")).toBeInTheDocument();
+    const chips = screen.getAllByTestId("trace-skill");
+    expect(chips.map((c) => c.textContent)).toEqual(["owasp-top10· 40 tok", "l02-secrets-gate· 52 tok"]);
+    expect(chips[0]).toHaveAttribute("title", "Imported skill — sent as untrusted data");
+    expect(screen.getByLabelText("untrusted")).toBeInTheDocument();
+    expect(screen.queryByText(/sent with each of/)).not.toBeInTheDocument();
+  });
+
+  it("map-reduce: says the block went with every call", () => {
+    currentTrace = {
+      ...TRACE,
+      tool_calls: [
+        { tool: "review_file", args: "a.ts", meta: "map-reduce", ms: 1 },
+        { tool: "review_file", args: "b.ts", meta: "map-reduce", ms: 1 },
+      ],
+      prompt_assembly: { ...TRACE.prompt_assembly, skills_tokens: 10 },
+    };
+    openPromptAssembly();
+    expect(screen.getByText("sent with each of 2 calls")).toBeInTheDocument();
+  });
+
+  it("an old trace (no counts) shows the block without numbers; no skills → no block", () => {
+    openPromptAssembly();
+    expect(screen.getByText("Skills — enabled skill bodies")).toBeInTheDocument();
+    expect(screen.queryByText(/tokens$/)).not.toBeInTheDocument();
+    cleanup();
+
+    currentTrace = { ...TRACE, prompt_assembly: { ...TRACE.prompt_assembly, skills: null } };
+    openPromptAssembly();
+    expect(screen.queryByText("Skills — enabled skill bodies")).not.toBeInTheDocument();
+  });
+});

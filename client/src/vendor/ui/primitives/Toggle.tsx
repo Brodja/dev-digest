@@ -1,19 +1,30 @@
 import React from "react";
 
+/**
+ * On/off switch. `type="button"` so it never submits a surrounding <form>;
+ * `label` gives it an accessible name (role="switch" needs one).
+ * onChange gets no event: to keep a click from reaching a clickable parent,
+ * stop propagation on a wrapper element.
+ */
 export function Toggle({
   on,
   onChange,
   size = 18,
+  label,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   size?: number;
+  label?: string;
 }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!on)}
       role="switch"
       aria-checked={on}
+      aria-label={label}
+      title={label}
       style={{
         width: size * 1.85,
         height: size + 4,

@@ -115,7 +115,14 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+// imported_file = uploaded .md / skill archive (server/specs/002-skills.md).
+export const SkillSource = z.enum([
+  'manual',
+  'imported_url',
+  'imported_file',
+  'extracted',
+  'community',
+]);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -128,8 +135,16 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Derived from `source` (TrustedSkillSource); false → wrapped as untrusted in the prompt. */
+  trusted: z.boolean(),
 });
 export type Skill = z.infer<typeof Skill>;
+
+/** GET /skills/:id — the skill plus the agents that link it. */
+export const SkillDetail = Skill.extend({
+  used_by: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type SkillDetail = z.infer<typeof SkillDetail>;
 
 export const CommunitySkill = z.object({
   name: z.string(),
@@ -189,5 +204,7 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; the skill reaches the prompt only if this AND Skill.enabled. */
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
