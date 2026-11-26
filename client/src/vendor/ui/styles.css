@@ -118,6 +118,16 @@
   box-sizing: border-box;
 }
 
+/* Native <select> popups are drawn by the browser / OS. Without a color-scheme
+   they stay light while the select's text is themed (light in dark mode), so
+   the options read as light grey on white. Match the popup to the theme. */
+select {
+  color-scheme: dark;
+}
+[data-theme="light"] select {
+  color-scheme: light;
+}
+
 html,
 body {
   margin: 0;

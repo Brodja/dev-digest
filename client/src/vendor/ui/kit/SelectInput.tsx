@@ -1,6 +1,11 @@
 import React from "react";
 import { Icon } from "../icons";
 
+const OPTION_STYLE: React.CSSProperties = {
+  background: "var(--bg-elevated)",
+  color: "var(--text-primary)",
+};
+
 /** REAL controlled <select>. */
 export function SelectInput({
   value,
@@ -45,7 +50,9 @@ export function SelectInput({
           const v = typeof o === "string" ? o : o.value;
           const l = typeof o === "string" ? o : o.label;
           return (
-            <option key={v} value={v}>
+            // Themed colours on the option too: browsers that ignore the
+            // select's color-scheme (styles.css) still get readable text.
+            <option key={v} value={v} style={OPTION_STYLE}>
               {l}
             </option>
           );
