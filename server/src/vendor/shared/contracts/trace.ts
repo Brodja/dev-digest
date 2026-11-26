@@ -109,7 +109,8 @@ export const RunSummary = z.object({
   cost_usd: z.number().nullable(),
   findings_count: z.number().int().nullable(),
   grounding: z.string().nullable(),
-  ran_at: z.string().nullable(),
+  /** When the run started (ISO). */
+  started_at: z.string().nullable(),
   // Review outcome, denormalized onto the run row at completion (the timeline
   // has no FK to the review). score = the review's 0-100 score; blockers =
   // findings that trip the agent's gate. Null on failed/cancelled runs.
