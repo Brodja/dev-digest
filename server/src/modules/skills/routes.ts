@@ -4,15 +4,9 @@ import { z } from 'zod';
 import { SkillType } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
+import { SkillBody, SkillDescription, SkillName } from '../_shared/skill-fields.js';
 import { NotFoundError } from '../../platform/errors.js';
-import { SkillsService } from './service.js';
-import {
-  IMPORT_BODY_LIMIT_BYTES,
-  SKILL_BODY_MAX,
-  SKILL_DESCRIPTION_MAX,
-  SKILL_NAME_HINT,
-  SKILL_NAME_PATTERN,
-} from './constants.js';
+import { IMPORT_BODY_LIMIT_BYTES } from './constants.js';
 
 /**
  * Skills module (server/specs/002-skills.md).
@@ -25,13 +19,6 @@ import {
  *   POST   /skills/import → save the confirmed draft (source = imported_file, disabled)
  * Linking skills to an agent lives in the agents module (/agents/:id/skills).
  */
-
-const SkillName = z.string().regex(SKILL_NAME_PATTERN, SKILL_NAME_HINT);
-const SkillDescription = z.string().trim().min(1).max(SKILL_DESCRIPTION_MAX);
-const SkillBody = z
-  .string()
-  .max(SKILL_BODY_MAX)
-  .refine((s) => s.trim().length > 0, 'Body must not be blank');
 
 const CreateSkillBody = z.object({
   name: SkillName,
@@ -61,7 +48,7 @@ const UpdateSkillBody = z.object({
 
 export default async function skillsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
-  const service = new SkillsService(app.container);
+  const service = app.container.skills;
 
   app.get('/skills', async (req) => {
     const { workspaceId } = await getContext(app.container, req);

@@ -6,6 +6,8 @@ import type {
   GitClient,
   CodeIndex,
   Embedder,
+  FeatureModelChoice,
+  FeatureModelId,
   LLMProvider,
   Tokenizer,
 } from '@devdigest/shared';
@@ -29,6 +31,8 @@ import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
+import { SkillsService } from '../modules/skills/service.js';
+import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 import { FflateArchiveReader } from '../adapters/archive/fflate.js';
@@ -78,6 +82,7 @@ export class Container {
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _skills?: SkillsService;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -107,6 +112,23 @@ export class Container {
 
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
+  }
+
+  /**
+   * Skills service (server/specs/002-skills.md). Shared so another feature (the
+   * conventions extractor, specs/003) creates skills through the same
+   * `create(…, source)` path as POST /skills, without importing the skills module.
+   */
+  get skills(): SkillsService {
+    return (this._skills ??= new SkillsService(this));
+  }
+
+  /**
+   * Provider + model for a system LLM feature: the workspace's choice in
+   * Settings → Feature Models, else the FEATURE_MODELS registry default.
+   */
+  featureModel(workspaceId: string, id: FeatureModelId): Promise<FeatureModelChoice> {
+    return resolveFeatureModel(this, workspaceId, id);
   }
 
   get codeIndex(): CodeIndex {

@@ -183,16 +183,60 @@ export const CommunitySkill = z.object({
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
-// ---- Conventions ----
+// ---- Conventions (server/specs/003-conventions.md) ----
+/** Derived from the two DB flags (accepted, rejected); never both. */
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+/** A candidate the model proposed AND code grounded in a sampled file. */
 export const ConventionCandidate = z.object({
   id: z.string(),
   rule: z.string(),
   evidence_path: z.string(),
+  /** The file's real lines evidence_start_line..evidence_end_line (not the model's text). */
   evidence_snippet: z.string(),
   confidence: z.number().min(0).max(1),
+  /** = status === 'accepted' (kept from the starter contract). */
   accepted: z.boolean(),
+  status: ConventionStatus,
+  evidence_start_line: z.number().int().positive(),
+  evidence_end_line: z.number().int().positive(),
+  /** HEAD the evidence was checked against; GitHub links pin it. */
+  commit_sha: z.string().nullable(),
+  created_at: z.string(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/** One extraction run: what was sent, what code kept or dropped, or why it failed. */
+export const ConventionScan = z.object({
+  id: z.string(),
+  status: z.enum(['succeeded', 'failed']),
+  error_code: z.string().nullable(),
+  error_message: z.string().nullable(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  commit_sha: z.string().nullable(),
+  /** Repo-relative paths sent to the model (samples + config files). */
+  files: z.array(z.string()),
+  proposed: z.number().int(),
+  kept: z.number().int(),
+  dropped_ungrounded: z.number().int(),
+  dropped_duplicate: z.number().int(),
+  tokens_in: z.number().int().nullable(),
+  tokens_out: z.number().int().nullable(),
+  attempts: z.number().int().nullable(),
+  cost_usd: z.number().nullable(),
+  started_at: z.string(),
+  finished_at: z.string(),
+});
+export type ConventionScan = z.infer<typeof ConventionScan>;
+
+/** GET /repos/:id/conventions and POST /repos/:id/conventions/extract. */
+export const ConventionsState = z.object({
+  scan: ConventionScan.nullable(),
+  candidates: z.array(ConventionCandidate),
+});
+export type ConventionsState = z.infer<typeof ConventionsState>;
 
 // ---- Agents ----
 export const Provider = z.enum(['openai', 'anthropic', 'openrouter']);

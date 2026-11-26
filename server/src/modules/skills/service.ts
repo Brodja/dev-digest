@@ -1,5 +1,12 @@
-import type { Skill, SkillDetail, SkillImportPreview, SkillSource, SkillType } from '@devdigest/shared';
-import type { Container } from '../../platform/container.js';
+import type {
+  ArchiveReader,
+  Skill,
+  SkillDetail,
+  SkillImportPreview,
+  SkillSource,
+  SkillType,
+} from '@devdigest/shared';
+import type { Db } from '../../db/client.js';
 import { SkillsRepository } from './repository.js';
 import { skillNameTakenError, toSkillDetailDto, toSkillDto } from './helpers.js';
 import {
@@ -40,11 +47,22 @@ export interface SkillUpload {
   content_base64: string;
 }
 
+/**
+ * What the service needs. Structural on purpose: the composition root passes
+ * itself (`container.skills`), and this file never imports `Container`, so the
+ * container can build the service without a dependency cycle. `archive` is read
+ * at call time, so a test override on the container still applies.
+ */
+export interface SkillsDeps {
+  readonly db: Db;
+  readonly archive: ArchiveReader;
+}
+
 export class SkillsService {
   private repo: SkillsRepository;
 
-  constructor(private container: Container) {
-    this.repo = new SkillsRepository(container.db);
+  constructor(private deps: SkillsDeps) {
+    this.repo = new SkillsRepository(deps.db);
   }
 
   async list(workspaceId: string): Promise<Skill[]> {
@@ -124,7 +142,7 @@ export class SkillsService {
   }
 
   private readArchive(bytes: Uint8Array): { text: string; skillPath: string; ignored: IgnoredFile[] } {
-    const archive = this.container.archive;
+    const archive = this.deps.archive;
     let entries;
     try {
       entries = archive.entries(bytes);

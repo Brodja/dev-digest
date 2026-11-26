@@ -41,7 +41,7 @@ listed in the trace's skills block with its tokens. The run executor does not ch
 | Term | Meaning |
 |---|---|
 | Scan | One extraction run for one repo: code picks files → one model call → code checks evidence → candidates stored. Recorded in `convention_scans`, failed or not. |
-| Sample set | The files sent to the model: up to 12 from `getConventionSamples` + up to 6 config files found by name. Fixed by code before the call. |
+| Sample set | The files sent to the model: 12 source files spread over packages from up to 400 ranked candidates of `getConventionSamples`, + up to 6 config files found by name (every package's `tsconfig.json` first). Fixed by code before the call. |
 | Candidate | A convention proposed by the model **and grounded by code**: rule text + one evidence range (`path`, `start_line`–`end_line`, the real lines) + confidence. |
 | Status | `pending` (new), `accepted`, `rejected`. Stored as two flags (`accepted`, `rejected`, never both); the API sends `status`. |
 | Grounded | `evidence_path` is one of the files in the sample set, and the snippet is found in that file's text (whitespace-normalised). Anything else is dropped before the DB. |
@@ -135,6 +135,7 @@ answer `85` or `1.2`, and a failed parse costs a repair request). Code clamps `c
 | 422 | `conventions_not_accepted` | a `convention_id` is not an accepted convention of this repo (`details.ids`) |
 | 500 | `config_error` | the provider's API key is missing (`ConfigError` from `container.llm`, passed through) |
 | 502 | `llm_failed` | the model call failed or its output did not parse after the repair attempt |
+| 502 | `llm_bad_output` | every proposed rule was a fragment (degenerate output); pending candidates are kept |
 
 Every error raised after the repo was found and the scan started is also stored as a `failed` scan (`error_code`,
 `error_message`), so the page shows the reason after a reload. `not_found` and `extraction_running` are not stored.
@@ -150,12 +151,15 @@ Every error raised after the repo was found and the scan started is also stored 
    second model call.
 3. **Sample set, chosen by code.**
    - No `clone_path` → 409 `repo_not_cloned`.
-   - `container.repoIntel.getConventionSamples(repoId, 12)`. Empty → `container.repoIntel.getIndexState(repoId)` decides
+   - `container.repoIntel.getConventionSamples(repoId, 400)` → ranked candidates (one DB query, no file read), then
+     `spreadSamples(candidates, 12)`: group by package (first path segment), round-robin one file per package in turn,
+     and inside a package round-robin over directories; rank order is kept inside each group; paths under a
+     dot-directory (`.claude`, `.github`) are skipped. Empty → `container.repoIntel.getIndexState(repoId)` decides
      between `repo_intel_disabled` and `repo_not_indexed`; no model call is made.
    - Config files by name, probed at the repo root and in each distinct first-level directory of the samples (a monorepo
-     keeps them per package, e.g. `server/tsconfig.json`): `tsconfig.json`, `eslint.config.{js,mjs,cjs,ts}`,
-     `.eslintrc`, `.eslintrc.{json,js,cjs}`, `.prettierrc`, `.prettierrc.json`, `prettier.config.{js,mjs,cjs}`. At most 6,
-     root first.
+     keeps them per package, e.g. `server/tsconfig.json`): first `tsconfig.json` of the root and of every package, then
+     `eslint.config.{js,mjs,cjs,ts}`, `.eslintrc`, `.eslintrc.{json,js,cjs}`, `.prettierrc`, `.prettierrc.json`,
+     `prettier.config.{js,mjs,cjs}` per directory, root first. At most 6.
    - Every read goes through the `GitClient` port: `container.git.readFile({ owner, name }, path)` (realpath containment
      in `src/adapters/git/simple-git.ts:267-276`; `MockGitClient({ files })` in tests). A read that throws, or returns
      empty text, means "absent" (the mock returns `''` for unknown paths). Files with a NUL byte or a line over 1 000
@@ -203,6 +207,9 @@ Any error from step 3 on is caught once: an `AppError` (including `ConfigError`)
 
 Pure functions in `evidence.ts` and `helpers.ts`; nothing here touches the disk or the model.
 
+- **Rule text.** After whitespace clean-up a rule needs at least 15 characters and 2 content words (stop words
+  removed); a fragment such as "Use \`" is dropped even when its evidence is real. When **every** proposal is such a
+  fragment, the output is degenerate: the scan fails with `llm_bad_output` and the pending candidates stay.
 - **Path.** `evidence_path` is normalised (strip a leading `./` or `/`, `\` → `/`) and must equal one of the paths in the
   sample set, case-sensitively (GitHub URLs are case-sensitive). `readFile` is never called with a path the model wrote,
   so a traversal path is simply not in the set. Evidence may come from a sample or a config file; only the cited file is
@@ -219,13 +226,14 @@ Pure functions in `evidence.ts` and `helpers.ts`; nothing here touches the disk 
 - **Lines and stored text.** `evidence_start_line` / `evidence_end_line` come from the match. `evidence_snippet` stores
   the file's real lines `start..end` (trailing whitespace trimmed), not the model's text; a partial-line match expands to
   whole lines.
-- **Confidence and cap.** Clamped to 0..1 (a value over 1 and up to 100 is read as a percentage); at most 15 candidates
-  are kept, highest confidence first.
+- **Confidence and cap.** Clamped to 0..1 (a value over 2 and up to 100 is read as a percentage, a small overshoot
+  such as 1.2 becomes 1); at most 15 candidates are kept, highest confidence first.
 - **Dedupe**, within the scan and against the decided rules: duplicate when the normalised rule texts (lower case,
   backticks and punctuation stripped, spaces collapsed) are equal, or their token sets (stop words removed) have Jaccard
   ≥ 0.8, or they cite the same file with overlapping lines and Jaccard ≥ 0.5. A rejected rule therefore does not come
   back on a re-scan, and an accepted one is not duplicated.
-- The scan records `proposed` (model output count), `kept`, `dropped_ungrounded` and `dropped_duplicate`.
+- The scan records `proposed` (model output count), `kept`, `dropped_ungrounded` (failed the code check: unusable rule
+  text, or no evidence in a sent file) and `dropped_duplicate`.
 
 ## Skill from conventions
 
@@ -330,6 +338,19 @@ All 2026-11-26.
 - **Code picks the files, one model call per scan** (homework requirement). The mock's two-step
   `ConventionFileSelection` dialogue is not used. Why code: the choice is deterministic and free, the model never wanders
   through the repo, and evidence is checked against exactly the bytes the model was shown.
+- **Samples are spread over packages, not taken as "the top 12"** (agreed with the user after the first live run).
+  repo-intel ranks can be all equal: on Brodja/dev-digest `file_rank` held one distinct rank for all 395 files, so the
+  order is Postgres's tie order, which even changes with `LIMIT`. The first live scan therefore sampled only
+  `server/src/server.ts` + `server/src/platform/*`; asking for 60 candidates would not help either (measured: the first
+  60 under `LIMIT 600` were 56 `client` files and 4 `.claude` scripts). So code asks for 400 candidates (cheap: paths
+  only) and spreads 12 over packages and their directories, keeping rank order within each group — when ranks are
+  real, every package still contributes its best files. Every package's `tsconfig.json` goes into the configs first.
+  Files are still picked by code; the model is still called once.
+- **Degenerate output is a model failure, not an empty result.** Seen live on the second scan (deepseek-v4-flash,
+  json_schema): all 12 proposals were the rule "Use \`" with the same snippet — the model closed the string right after
+  a backtick. Evidence matched, so only a rule-text check catches it. The prompt now asks for plain-text rules without
+  backticks, code drops fragment rules, and an all-fragment answer fails the scan (`llm_bad_output`) without replacing
+  the pending candidates.
 - **Code computes line numbers and stores the real lines.** The model only names a file and quotes text; it never gives
   line numbers (they are not in the prompt either).
 - **Rejected as an extra flag** (agreed with the user): `rejected boolean` + CHECK, `accepted` kept as is, `status`
@@ -397,12 +418,15 @@ Tests (mock LLM, no network):
   occurrences; a partial line expands to whole lines; empty / too short snippet rejected; over 40 lines rejected; a
   snippet past the truncation point rejected; fences stripped; correct lines at the start and the end of a file; stored
   snippet = the file's lines.
-- `test/conventions-helpers.test.ts` — path normalisation (`./`, `\`; other case → no match); probe dirs for a monorepo;
-  truncation keeps line numbers; dedupe (equal, Jaccard, same place); confidence clamp; cap at 15.
+- `test/conventions-helpers.test.ts` — path normalisation (`./`, `\`; other case → no match); probe dirs for a monorepo,
+  every package's tsconfig first; `spreadSamples` over packages and directories with tied ranks (dot-dirs skipped,
+  dedupe, fewer candidates than 12); truncation keeps line numbers; dedupe (equal, Jaccard, same place); confidence
+  clamp; cap at 15.
 - `test/conventions-prompt.test.ts` — every file wrapped untrusted with a sanitised label; no line numbers; decided rules
   listed (capped); the JSON schema has no optional fields.
-- `test/conventions-service.test.ts` (stubs as in `test/repo-intel-resync.test.ts`) — `getConventionSamples(repoId, 12)`
-  is called; exactly one `completeStructured` with `schemaName: 'ConventionExtraction'` and the feature model's model;
+- `test/conventions-service.test.ts` (stubs as in `test/repo-intel-resync.test.ts`) — `getConventionSamples(repoId, 400)`
+  is called; with one package ranked first the 12 samples still come from every package and each package's tsconfig
+  is sent; exactly one `completeStructured` with `schemaName: 'ConventionExtraction'` and the feature model's model;
   no samples → 409 and no model call; model error → 502 and a failed scan; `repo_changed` when HEAD moves.
 - `test/conventions.it.test.ts` (Docker; `buildApp` with `MockLLMProvider('openai', { structuredBySchema:
   { ConventionExtraction } })`, `MockGitClient({ files, head })`, a `repoIntel` override; the seed repo gets a
