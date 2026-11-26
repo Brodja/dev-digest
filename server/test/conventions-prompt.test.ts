@@ -44,6 +44,10 @@ describe('buildExtractionMessages', () => {
     expect(none[1]!.content).not.toContain('do not propose');
   });
 
+  it('asks for English plain-text rules (seen live: Chinese rules, and fragments cut at a backtick)', () => {
+    expect(system!.content).toContain('in English and plain text (no backticks, no markdown)');
+  });
+
   it('has no line numbers for the model to copy', () => {
     expect(user!.content).not.toMatch(/^\s*\d+\s*[|:]/m);
   });

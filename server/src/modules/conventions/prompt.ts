@@ -47,7 +47,7 @@ const SYSTEM = [
   'error objects." Skip generic language or framework facts every project shares, and one-off code.',
   '',
   'Return at most 12 conventions. For each:',
-  '- rule: the directive sentence, in plain text (no backticks, no markdown).',
+  '- rule: the directive sentence, in English and plain text (no backticks, no markdown).',
   '- evidence_path: the path of ONE file below that shows the rule, exactly as written in its "File:" header.',
   '- evidence_snippet: 1 to 15 contiguous lines copied VERBATIM from that file. No "...", no edits,',
   '  no line numbers, no code fences.',
