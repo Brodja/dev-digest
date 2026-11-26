@@ -69,7 +69,12 @@ export function ConventionsView({ repoId }: { repoId: string }) {
       ? errorText(scan.error_code, scan.error_message)
       : null;
 
-  const setStatus = (c: ConventionCandidate, status: ConventionStatus) => update.mutate({ id: c.id, patch: { status } });
+  const setStatus = (c: ConventionCandidate, status: ConventionStatus) => {
+    // Any status change forgets an earlier "leave out": a convention moved back to
+    // review (or rejected) and accepted again is selected for the skill again.
+    include(c.id, true);
+    update.mutate({ id: c.id, patch: { status } });
+  };
   const saveRule = (c: ConventionCandidate, rule: string) => update.mutateAsync({ id: c.id, patch: { rule } });
 
   /** "N candidates · grounded … · M sampled files · last scan 5 min ago · K proposals dropped without evidence". */

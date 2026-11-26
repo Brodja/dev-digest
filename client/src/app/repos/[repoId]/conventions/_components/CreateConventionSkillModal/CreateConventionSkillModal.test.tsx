@@ -104,6 +104,24 @@ describe("CreateConventionSkillModal", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/no longer accepted/);
   });
 
+  it("freezes the convention ids with the draft when it opens (a refetch while open changes neither)", () => {
+    const modal = (conventions: ConventionCandidate[]) => (
+      <NextIntlClientProvider locale="en" messages={{ conventions: conventionsMessages, skills: skillsMessages }}>
+        <ToastProvider>
+          <CreateConventionSkillModal repoId="r1" repoName="acme/api" conventions={conventions} onClose={vi.fn()} />
+        </ToastProvider>
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(modal(ACCEPTED));
+    // The page refetched: a2 is no longer in the selected list.
+    rerender(modal([ACCEPTED[0]!]));
+    expect(screen.getByText(/Merged from 2 accepted conventions/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
+    const [payload] = mutate.mock.calls[0]!;
+    expect(payload.convention_ids).toEqual(["a1", "a2"]);
+    expect(payload.body).toContain("Name files in kebab-case.");
+  });
+
   it("blocks a blank body and sends nothing; Cancel sends nothing", () => {
     const onClose = renderModal();
     fireEvent.change(screen.getByRole("textbox", { name: "Skill body" }), { target: { value: "   " } });

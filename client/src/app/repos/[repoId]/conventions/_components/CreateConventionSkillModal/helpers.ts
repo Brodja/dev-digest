@@ -1,6 +1,6 @@
 import type { ConventionCandidate } from "@devdigest/shared";
 import type { SkillFormValues } from "@/components/SkillForm";
-import { lineRef } from "../ConventionCard/helpers";
+import { lineRef } from "@/app/repos/[repoId]/conventions/helpers";
 
 export const DEFAULT_SKILL_NAME = "repo-conventions";
 

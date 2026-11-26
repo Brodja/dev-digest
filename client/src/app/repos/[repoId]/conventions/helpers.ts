@@ -1,3 +1,6 @@
+/* Page-level helpers of /repos/:repoId/conventions, shared by its components
+   (ConventionCard shows the evidence label, CreateConventionSkillModal writes the
+   references into the skill draft). */
 import type { ConventionCandidate } from "@devdigest/shared";
 
 /** "L12" or "L12-L14" — the same anchor GitHub uses. */

@@ -312,7 +312,10 @@ Placement follows `frontend-architecture`; strings go through next-intl.
   banner "Merged from N accepted conventions in `<repo>`. Everything below is editable before you save."; `SkillForm`
   with `lockedType="convention"` and `hideEnabled`; footer Cancel / Create skill; 409 → `nameTaken` inline, other errors
   inline; success → toast with the skill name, modal closes. Its `helpers.ts` holds `composeSkillDraft(repo,
-  conventions, takenNames)` and `freeSkillName`; `ConventionCard/helpers.ts` holds `lineRef` (`L12` / `L12-L14`).
+  conventions, takenNames)` and `freeSkillName`. `lineRef` (`L12` / `L12-L14`), used by both the card and the
+  modal, lives in the page-level `app/repos/[repoId]/conventions/helpers.ts` (as `pulls/helpers.ts` does), so no
+  component imports another component's internals. The modal freezes the draft **and** the `convention_ids` when it
+  opens, so a refetch while it is open cannot make them diverge.
 
 ### Shared pieces
 

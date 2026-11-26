@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 import { Button, Checkbox, IconBtn, MonoLink, ProgressBar, Textarea } from "@devdigest/ui";
 import type { ConventionCandidate, ConventionStatus } from "@devdigest/shared";
 import { githubBlobUrl } from "@/lib/github-urls";
-import { lineRef } from "./helpers";
+import { lineRef } from "@/app/repos/[repoId]/conventions/helpers";
 import { s } from "./styles";
 
 export interface ConventionRepo {

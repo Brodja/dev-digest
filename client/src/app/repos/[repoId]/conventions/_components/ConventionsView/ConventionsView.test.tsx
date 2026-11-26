@@ -86,14 +86,16 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const ui = () => (
+  <NextIntlClientProvider locale="en" messages={{ conventions: conventionsMessages, skills: skillsMessages }}>
+    <ToastProvider>
+      <ConventionsView repoId="r1" />
+    </ToastProvider>
+  </NextIntlClientProvider>
+);
+
 function renderView() {
-  render(
-    <NextIntlClientProvider locale="en" messages={{ conventions: conventionsMessages, skills: skillsMessages }}>
-      <ToastProvider>
-        <ConventionsView repoId="r1" />
-      </ToastProvider>
-    </NextIntlClientProvider>,
-  );
+  return render(ui());
 }
 
 describe("ConventionsView (/repos/:repoId/conventions)", () => {
@@ -194,6 +196,26 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
       expect(bodyOfModal()).not.toContain(ACCEPTED.rule);
       fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
       expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["a2"] });
+    });
+
+    it("a convention moved back to review and accepted again is selected again", () => {
+      const { rerender } = renderView();
+      fireEvent.click(includeBox(ACCEPTED_2.rule)); // leave it out
+      expect(screen.getByText("1 of 2 accepted selected for the skill")).toBeInTheDocument();
+
+      // Back to review (second click on "Accepted")…
+      fireEvent.click(within(screen.getByRole("article", { name: ACCEPTED_2.rule })).getByRole("button", { name: "Accepted" }));
+      expect(update.mutate).toHaveBeenLastCalledWith({ id: "a2", patch: { status: "pending" } });
+      const asPending = { ...ACCEPTED_2, status: "pending" as const, accepted: false };
+      query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, asPending, REJECTED] }, isLoading: false, isError: false };
+      rerender(ui());
+
+      // …and accepted again: selected for the skill, not left out.
+      fireEvent.click(within(screen.getByRole("article", { name: ACCEPTED_2.rule })).getByRole("button", { name: "Accept" }));
+      query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, ACCEPTED_2, REJECTED] }, isLoading: false, isError: false };
+      rerender(ui());
+      expect(includeBox(ACCEPTED_2.rule)).toHaveAttribute("aria-checked", "true");
+      expect(screen.getByText("2 of 2 accepted selected for the skill")).toBeInTheDocument();
     });
 
     it("disables Accept as Skill when nothing is selected", () => {

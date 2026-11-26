@@ -24,7 +24,7 @@ export function CreateConventionSkillModal({
 }: {
   repoId: string;
   repoName: string;
-  /** The accepted conventions that go into the skill. */
+  /** The accepted (selected) conventions that go into the skill — read once, when the modal opens. */
   conventions: readonly ConventionCandidate[];
   onClose: () => void;
 }) {
@@ -32,6 +32,9 @@ export function CreateConventionSkillModal({
   const toast = useToast();
   const create = useCreateConventionSkill(repoId);
   const { data: skills } = useSkills();
+  // Frozen when the modal opens, together with the draft built from them: a refetch
+  // while it is open must not make the saved ids and the body text disagree.
+  const [conventionIds] = React.useState<readonly string[]>(() => conventions.map((c) => c.id));
   const [values, setValues] = React.useState<SkillFormValues>(() =>
     composeSkillDraft(repoName, conventions, (skills ?? []).map((sk) => sk.name)),
   );
@@ -64,7 +67,7 @@ export function CreateConventionSkillModal({
         name: values.name,
         description: values.description.trim(),
         body: values.body,
-        convention_ids: conventions.map((c) => c.id),
+        convention_ids: [...conventionIds],
       },
       {
         onSuccess: (skill) => {
@@ -105,7 +108,7 @@ export function CreateConventionSkillModal({
       <div style={s.body}>
         <div style={s.merged}>
           <Icon.Wrench size={15} style={s.mergedIcon} />
-          <span>{t("modal.merged", { count: conventions.length, repo: repoName })}</span>
+          <span>{t("modal.merged", { count: conventionIds.length, repo: repoName })}</span>
         </div>
         <SkillForm
           values={values}
