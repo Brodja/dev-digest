@@ -112,17 +112,19 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
     expect(extract.mutate).toHaveBeenCalledTimes(1);
   });
 
-  it("lists every candidate in one list, in server order, with the scan summary and the accepted count", () => {
-    query = { data: { scan: scan(), candidates: [ACCEPTED, REJECTED, PENDING] }, isLoading: false, isError: false };
+  const order = () =>
+    within(screen.getByRole("list", { name: "Convention candidates" }))
+      .getAllByRole("article")
+      .map((a) => a.getAttribute("aria-label"));
+
+  it("lists every candidate in one list, with the scan summary and the accepted count", () => {
+    // The server sorts by status (pending → accepted → rejected); the page does not.
+    query = { data: { scan: scan(), candidates: [PENDING, ACCEPTED, REJECTED] }, isLoading: false, isError: false };
     renderView();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Conventions in acme/api");
     expect(screen.getByText(/3 candidates · grounded against sampled files · 16 sampled files · last scan 5 minutes ago · 1 proposal dropped without evidence/)).toBeInTheDocument();
-    const list = screen.getByRole("list", { name: "Convention candidates" });
-    expect(within(list).getAllByRole("article").map((a) => a.getAttribute("aria-label"))).toEqual([
-      ACCEPTED.rule,
-      REJECTED.rule,
-      PENDING.rule,
-    ]);
+    // Same confidence and age here → by rule.
+    expect(order()).toEqual([ACCEPTED.rule, REJECTED.rule, PENDING.rule]);
     expect(screen.queryByRole("region", { name: "To review" })).toBeNull();
     expect(screen.getByText("1 of 3 accepted")).toBeInTheDocument();
     // The rejected card stays in place, marked.
@@ -130,6 +132,17 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  it("a decision does not move the card (the order ignores the status)", () => {
+    const { rerender } = renderView();
+    const before = order();
+    fireEvent.click(within(screen.getByRole("article", { name: PENDING.rule })).getByRole("button", { name: "Accept" }));
+    // The refetch comes back sorted by status on the server: accepted after pending.
+    const p1 = { ...PENDING, status: "accepted" as const, accepted: true };
+    query = { data: { scan: scan(), candidates: [ACCEPTED, p1, REJECTED] }, isLoading: false, isError: false };
+    rerender(ui());
+    expect(order()).toEqual(before);
   });
 
   it("Select all accepts every candidate still to review (not the rejected ones)", () => {
@@ -218,7 +231,8 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
       const { rerender } = renderView();
       fireEvent.click(screen.getByRole("button", { name: "Accept as Skill" }));
       fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
-      expect(create.mutate.mock.calls[0]![0]).toMatchObject({ name: "repo-conventions", convention_ids: ["a1", "a2"] });
+      // List order: "Name files…" before "Throw NotFoundError…".
+      expect(create.mutate.mock.calls[0]![0]).toMatchObject({ name: "repo-conventions", convention_ids: ["a2", "a1"] });
       fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
       // Change the set: a2 back to review, p1 accepted; the first skill now exists.
@@ -238,7 +252,7 @@ describe("ConventionsView (/repos/:repoId/conventions)", () => {
       expect(bodyOfModal()).toContain(ACCEPTED.rule);
       expect(bodyOfModal()).not.toContain(ACCEPTED_2.rule);
       fireEvent.click(screen.getByRole("button", { name: "Create skill" }));
-      expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["p1", "a1"] });
+      expect(create.mutate.mock.calls[1]![0]).toMatchObject({ name: "repo-conventions-2", convention_ids: ["a1", "p1"] });
     });
   });
 

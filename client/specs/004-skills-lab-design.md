@@ -39,8 +39,9 @@ Homework L02, 2026-11-27. Spans client + server; this file is the spec, `server/
 7. **Conventions P3:** the accepted set is the skill. The "Include in skill" checkbox goes; a second skill is built after
    changing the accepted set, and the modal proposes a free name (`repo-conventions-2`). *Select all* accepts every
    pending candidate (rejected ones stay rejected); *Deselect all* moves accepted ones back to pending.
-8. **One list of candidates** in server order. A rejected card stays in place, dimmed, its button reads *Rejected*
-   (click = undo), as the homework asks for a visible Rejected mark.
+8. **One list of candidates** in an order that ignores the status (confidence, then age, rule, id — the server's keys
+   minus the status, which it sorts first for the old sections), so a decision never moves a card. A rejected card
+   stays in place, dimmed, its button reads *Rejected* (click = undo), as the homework asks for a visible Rejected mark.
 9. **Route** stays `/repos/:repoId/conventions` (the menu item fills in the active repo).
 10. **Enabled in the conventions modal** → optional `enabled` (default `true`) in `POST /repos/:id/conventions/skill`.
 11. **`CodeEditor`** (line numbers, `<name>.md` header, *unsaved*, token estimate) joins `@devdigest/ui`; `SkillForm`

@@ -18,4 +18,6 @@ export const s = {
     color: "var(--text-primary)",
   } satisfies CSSProperties,
   untrustedIcon: { color: "var(--warn)", flexShrink: 0, marginTop: 2 } satisfies CSSProperties,
+  /** Long code lines scroll inside the preview, not the whole pane. */
+  body: { overflowX: "auto", minWidth: 0 } satisfies CSSProperties,
 } as const;

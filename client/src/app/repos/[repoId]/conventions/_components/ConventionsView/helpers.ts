@@ -1,5 +1,21 @@
 import type { ConventionCandidate, ConventionStatus } from "@devdigest/shared";
 
+/**
+ * One list whose order never depends on the status (client/specs/004): the
+ * server sorts pending → accepted → rejected (made for the old sections), so a
+ * click on Accept would make the card jump. Same keys as the server minus the
+ * status: confidence desc, then age, rule and id as tie-breakers.
+ */
+export function stableOrder(candidates: readonly ConventionCandidate[]): ConventionCandidate[] {
+  return [...candidates].sort(
+    (a, b) =>
+      b.confidence - a.confidence ||
+      a.created_at.localeCompare(b.created_at) ||
+      (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+}
+
 /** What the Select all / Deselect all toggle does right now. */
 export interface BulkAction {
   kind: "select" | "deselect";

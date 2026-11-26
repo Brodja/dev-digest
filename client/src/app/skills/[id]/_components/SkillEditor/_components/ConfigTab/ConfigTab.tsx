@@ -103,6 +103,7 @@ export function ConfigTab({ skill }: { skill: Skill }) {
         nameTaken={nameTaken}
         hideEnabled
         bodyDirty={bodyDirty}
+        autoFocusName={false}
       />
 
       <div style={s.actions}>

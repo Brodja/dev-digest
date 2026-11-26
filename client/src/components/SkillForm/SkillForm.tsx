@@ -23,6 +23,7 @@ export function SkillForm({
   lockedType,
   bodyDirty,
   bodyHint,
+  autoFocusName = true,
 }: {
   values: SkillFormValues;
   onChange: (patch: Partial<SkillFormValues>) => void;
@@ -38,6 +39,8 @@ export function SkillForm({
   bodyDirty?: boolean;
   /** Replaces the default hint under the body. */
   bodyHint?: string;
+  /** Focus the name when the form mounts (modals); off on a page (the skill's Config tab). */
+  autoFocusName?: boolean;
 }) {
   const t = useTranslations("skills");
   const issues = validateSkill(values);
@@ -68,7 +71,7 @@ export function SkillForm({
           placeholder={t("editor.namePlaceholder")}
           aria-label={t("editor.name")}
           aria-invalid={!!errorOf("name")}
-          autoFocus
+          autoFocus={autoFocusName}
         />
         {fieldError("name")}
       </FormField>

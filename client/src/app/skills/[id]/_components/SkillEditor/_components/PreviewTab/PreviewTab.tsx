@@ -23,7 +23,7 @@ export function PreviewTab({ skill }: { skill: Skill }) {
         </div>
       )}
       <Card>
-        <div data-testid="skill-preview">
+        <div data-testid="skill-preview" style={s.body}>
           <Markdown>{promptBlock(skill)}</Markdown>
         </div>
       </Card>

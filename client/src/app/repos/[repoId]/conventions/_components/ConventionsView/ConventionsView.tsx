@@ -1,6 +1,7 @@
 /* ConventionsView — the Conventions page (server/specs/003-conventions.md,
    redesigned in client/specs/004 after screen_conv_conf.jsx): "Conventions in
-   <repo>" with Re-scan, one list of candidate cards in server order, Select all /
+   <repo>" with Re-scan, one list of candidate cards in a status-independent
+   order (a decision never moves a card), Select all /
    Deselect all with "N of M accepted", and "Accept as Skill" for the accepted
    set (P3: change the accepted set, build another skill). Empty state until the
    first scan; a clear banner when a scan failed. */
@@ -23,7 +24,7 @@ import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { useToast } from "@/lib/toast";
 import { ConventionCard } from "../ConventionCard";
 import { CreateConventionSkillModal } from "../CreateConventionSkillModal";
-import { bulkAction, isKnownScanError } from "./helpers";
+import { bulkAction, isKnownScanError, stableOrder } from "./helpers";
 import { s } from "./styles";
 
 export function ConventionsView({ repoId }: { repoId: string }) {
@@ -50,7 +51,7 @@ export function ConventionsView({ repoId }: { repoId: string }) {
   }
 
   const scan = data?.scan ?? null;
-  const candidates = data?.candidates ?? [];
+  const candidates = stableOrder(data?.candidates ?? []);
   const accepted = candidates.filter((c) => c.status === "accepted");
   const toggleAll = bulkAction(candidates);
   const scanning = extract.isPending;
