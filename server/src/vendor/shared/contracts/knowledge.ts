@@ -153,6 +153,18 @@ export const SkillDetail = Skill.extend({
 });
 export type SkillDetail = z.infer<typeof SkillDetail>;
 
+/** GET /skills — a skill plus its usage across the workspace (the list card,
+    client/specs/004). Rates are 0..1; null when there is nothing to divide by. */
+export const SkillListItem = Skill.extend({
+  /** Agents of the workspace that link the skill, in any link state. */
+  used_by_count: z.number().int(),
+  /** Share of the workspace's review runs with a trace whose config.skills holds this skill. */
+  pull_rate: z.number().nullable(),
+  /** accepted / (accepted + dismissed) findings of those runs. */
+  accept_rate: z.number().nullable(),
+});
+export type SkillListItem = z.infer<typeof SkillListItem>;
+
 /** GET /skills/:id/versions — one body snapshot; every body change adds one
     (client/specs/004-skills-lab-design.md). Name, description and type are not versioned. */
 export const SkillVersion = z.object({
@@ -183,6 +195,9 @@ export const SkillStats = z.object({
   version_count: z.number().int(),
   used_by_count: z.number().int(),
   in_prompt_count: z.number().int(),
+  /** Same as SkillListItem.pull_rate / accept_rate. */
+  pull_rate: z.number().nullable(),
+  accept_rate: z.number().nullable(),
   agents: z.array(SkillUsage),
 });
 export type SkillStats = z.infer<typeof SkillStats>;

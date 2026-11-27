@@ -3,6 +3,7 @@ import type {
   Skill,
   SkillDetail,
   SkillImportPreview,
+  SkillListItem,
   SkillSource,
   SkillStats,
   SkillType,
@@ -15,6 +16,7 @@ import {
   skillNameTakenError,
   toSkillDetailDto,
   toSkillDto,
+  toSkillListItemDto,
   toSkillStatsDto,
   toSkillVersionDto,
 } from './helpers.js';
@@ -74,9 +76,11 @@ export class SkillsService {
     this.repo = new SkillsRepository(deps.db);
   }
 
-  async list(workspaceId: string): Promise<Skill[]> {
-    const rows = await this.repo.list(workspaceId);
-    return rows.map(toSkillDto);
+  /** Every skill with its usage (agents, pull rate, accept rate): two queries in all, no N+1. */
+  async list(workspaceId: string): Promise<SkillListItem[]> {
+    const [rows, totals] = await Promise.all([this.repo.list(workspaceId), this.repo.usageTotals(workspaceId)]);
+    const bySkill = new Map(totals.map((u) => [u.skillId, u]));
+    return rows.map((row) => toSkillListItemDto(row, bySkill.get(row.id)));
   }
 
   async get(workspaceId: string, id: string): Promise<SkillDetail | undefined> {
@@ -136,11 +140,12 @@ export class SkillsService {
   /** Which agents link the skill, and how many body versions it has. */
   async stats(workspaceId: string, id: string): Promise<SkillStats> {
     const skill = await this.requireSkill(workspaceId, id);
-    const [versionCount, usage] = await Promise.all([
+    const [versionCount, usage, [totals]] = await Promise.all([
       this.repo.countVersions(id),
       this.repo.usage(workspaceId, id),
+      this.repo.usageTotals(workspaceId, id),
     ]);
-    return toSkillStatsDto(skill, versionCount, usage);
+    return toSkillStatsDto(skill, versionCount, usage, totals);
   }
 
   private async requireSkill(workspaceId: string, id: string) {

@@ -10,7 +10,7 @@ import { IMPORT_BODY_LIMIT_BYTES } from './constants.js';
 
 /**
  * Skills module (server/specs/002-skills.md).
- *   GET    /skills       → list (workspace-scoped, by name)
+ *   GET    /skills       → list (workspace-scoped, by name) + used_by_count, pull_rate, accept_rate
  *   GET    /skills/:id   → one skill + the agents that link it (used_by)
  *   POST   /skills       → create (source = manual, v1)
  *   PUT    /skills/:id   → partial update; a changed body bumps the version

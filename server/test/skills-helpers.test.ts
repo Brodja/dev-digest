@@ -5,8 +5,10 @@ import {
   skillNameTakenError,
   toSkillDetailDto,
   toSkillDto,
+  toSkillListItemDto,
   toSkillStatsDto,
   toSkillVersionDto,
+  usageRates,
 } from '../src/modules/skills/helpers.js';
 import { SKILL_NAME_PATTERN } from '../src/modules/skills/constants.js';
 import type { SkillRow } from '../src/db/rows.js';
@@ -73,6 +75,32 @@ describe('toSkillVersionDto', () => {
   });
 });
 
+describe('usageRates (list card / Stats)', () => {
+  const counts = { usedBy: 2, runs: 3, totalRuns: 12, accepted: 6, dismissed: 2 };
+
+  it('pull = runs that sent the skill / all traced runs; accept = accepted / decided findings', () => {
+    expect(usageRates(counts)).toEqual({ used_by_count: 2, pull_rate: 0.25, accept_rate: 0.75 });
+  });
+
+  it('is null, not 0, when there is nothing to divide by', () => {
+    expect(usageRates({ ...counts, runs: 0, totalRuns: 0 })).toMatchObject({ pull_rate: null });
+    expect(usageRates({ ...counts, accepted: 0, dismissed: 0 })).toMatchObject({ accept_rate: null });
+    expect(usageRates(undefined)).toEqual({ used_by_count: 0, pull_rate: null, accept_rate: null });
+  });
+
+  it('a skill no run sent in a workspace with runs has a real 0% pull and no accept rate', () => {
+    expect(usageRates({ usedBy: 0, runs: 0, totalRuns: 5, accepted: 0, dismissed: 0 })).toEqual({
+      used_by_count: 0,
+      pull_rate: 0,
+      accept_rate: null,
+    });
+  });
+
+  it('puts the rates on the list DTO next to the skill fields', () => {
+    expect(toSkillListItemDto(row(), counts)).toMatchObject({ id: 'sk-1', used_by_count: 2, pull_rate: 0.25, accept_rate: 0.75 });
+  });
+});
+
 describe('toSkillStatsDto', () => {
   const usage = [
     { agentId: 'a1', agentName: 'Alpha', agentEnabled: true, linkEnabled: true, position: 2 },
@@ -96,6 +124,13 @@ describe('toSkillStatsDto', () => {
 
   it('an unused skill has no agents', () => {
     expect(toSkillStatsDto(row(), 1, [])).toMatchObject({ used_by_count: 0, in_prompt_count: 0, agents: [] });
+  });
+
+  it('carries the pull and accept rates (null without data)', () => {
+    expect(toSkillStatsDto(row(), 1, [])).toMatchObject({ pull_rate: null, accept_rate: null });
+    expect(
+      toSkillStatsDto(row(), 1, [], { usedBy: 0, runs: 1, totalRuns: 4, accepted: 1, dismissed: 1 }),
+    ).toMatchObject({ pull_rate: 0.25, accept_rate: 0.5 });
   });
 });
 

@@ -26,6 +26,20 @@ export interface SkillUsageRow {
   position: number;
 }
 
+/** Raw usage counts of one skill across its workspace (rates are computed in helpers). */
+export interface SkillUsageTotals {
+  skillId: string;
+  /** Agents of the workspace that link the skill, any link state. */
+  usedBy: number;
+  /** Review runs with a trace whose config.skills holds the skill. */
+  runs: number;
+  /** All review runs of the workspace that have a trace. */
+  totalRuns: number;
+  /** Findings of those `runs`, accepted / dismissed (mutually exclusive). */
+  accepted: number;
+  dismissed: number;
+}
+
 export type RestoreResult =
   | { status: 'skill_not_found' }
   | { status: 'version_not_found' }
@@ -211,6 +225,66 @@ export class SkillsRepository {
       .innerJoin(t.agents, eq(ranked.agentId, t.agents.id))
       .where(and(eq(ranked.skillId, skillId), eq(t.agents.workspaceId, workspaceId)))
       .orderBy(asc(t.agents.name));
+  }
+
+  /**
+   * Usage counts of every skill of the workspace (or of one), in ONE query: links
+   * from agent_skills, runs from run_traces (trace → config.skills[].id, the
+   * skills a run really sent), findings of those runs via reviews.run_id.
+   * Everything is scoped to the workspace; skills without runs or links get 0s.
+   */
+  async usageTotals(workspaceId: string, skillId?: string): Promise<SkillUsageTotals[]> {
+    const rows = await this.db.execute(sql`
+      WITH ws_runs AS (
+        SELECT ar.id AS run_id,
+               CASE WHEN jsonb_typeof(rt.trace -> 'config' -> 'skills') = 'array'
+                    THEN rt.trace -> 'config' -> 'skills' ELSE '[]'::jsonb END AS skills
+        FROM agent_runs ar
+        JOIN run_traces rt ON rt.run_id = ar.id
+        WHERE ar.workspace_id = ${workspaceId}
+      ),
+      run_skills AS (
+        SELECT DISTINCT r.run_id, s.elem ->> 'id' AS skill_id
+        FROM ws_runs r CROSS JOIN LATERAL jsonb_array_elements(r.skills) AS s(elem)
+      ),
+      run_findings AS (
+        SELECT rv.run_id,
+               count(*) FILTER (WHERE f.accepted_at IS NOT NULL) AS accepted,
+               count(*) FILTER (WHERE f.dismissed_at IS NOT NULL) AS dismissed
+        FROM reviews rv
+        JOIN findings f ON f.review_id = rv.id
+        WHERE rv.workspace_id = ${workspaceId} AND rv.run_id IS NOT NULL
+        GROUP BY rv.run_id
+      ),
+      skill_runs AS (
+        SELECT rs.skill_id,
+               count(*) AS runs,
+               coalesce(sum(rf.accepted), 0) AS accepted,
+               coalesce(sum(rf.dismissed), 0) AS dismissed
+        FROM run_skills rs
+        LEFT JOIN run_findings rf ON rf.run_id = rs.run_id
+        GROUP BY rs.skill_id
+      ),
+      links AS (
+        SELECT l.skill_id, count(*) AS used_by
+        FROM agent_skills l
+        JOIN agents a ON a.id = l.agent_id
+        WHERE a.workspace_id = ${workspaceId}
+        GROUP BY l.skill_id
+      )
+      SELECT s.id AS "skillId",
+             coalesce(l.used_by, 0)::int AS "usedBy",
+             coalesce(sr.runs, 0)::int AS "runs",
+             (SELECT count(*) FROM ws_runs)::int AS "totalRuns",
+             coalesce(sr.accepted, 0)::int AS "accepted",
+             coalesce(sr.dismissed, 0)::int AS "dismissed"
+      FROM skills s
+      LEFT JOIN links l ON l.skill_id = s.id
+      LEFT JOIN skill_runs sr ON sr.skill_id = s.id::text
+      WHERE s.workspace_id = ${workspaceId}
+        ${skillId ? sql`AND s.id = ${skillId}` : sql``}
+    `);
+    return rows as unknown as SkillUsageTotals[];
   }
 
   private async lockSkill(tx: Tx, workspaceId: string, id: string): Promise<SkillRow | undefined> {
