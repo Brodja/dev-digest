@@ -10,15 +10,17 @@ import type {
   Skill,
   SkillDetail,
   SkillImportPreview,
+  SkillListItem,
   SkillStats,
   SkillType,
   SkillVersion,
 } from "@devdigest/shared";
 
+/** Every skill of the workspace with its usage (agents, pull rate, accept rate). */
 export function useSkills() {
   return useQuery({
     queryKey: ["skills"],
-    queryFn: () => api.get<Skill[]>("/skills"),
+    queryFn: () => api.get<SkillListItem[]>("/skills"),
   });
 }
 

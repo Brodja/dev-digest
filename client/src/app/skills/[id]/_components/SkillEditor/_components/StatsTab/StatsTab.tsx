@@ -1,6 +1,7 @@
 /* StatsTab — who uses the skill (screen_skills.jsx SkillStatsTab, trimmed to
-   honest data, client/specs/004): Used by, In prompt, Versions, and the agents
-   with the skill's place in their order and why it is (not) in their prompt. */
+   honest data, client/specs/004): Used by, In prompt, Pull frequency, Accept
+   rate, Versions, and the agents with the skill's place in their order and why
+   it is (not) in their prompt. */
 "use client";
 
 import React from "react";
@@ -9,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { Badge, EmptyState, ErrorState, Icon, SectionLabel, Skeleton } from "@devdigest/ui";
 import type { SkillUsage } from "@devdigest/shared";
 import { useSkillStats } from "@/lib/hooks/skills";
+import { acceptRateColor, formatRate } from "@/app/skills/helpers";
 import { s } from "./styles";
 
 export function StatsTab({ skillId }: { skillId: string }) {
@@ -23,6 +25,13 @@ export function StatsTab({ skillId }: { skillId: string }) {
       <div style={s.cards}>
         <Stat label={t("stats.usedBy")} value={stats.used_by_count} suffix={t("stats.agentsUnit", { count: stats.used_by_count })} />
         <Stat label={t("stats.inPrompt")} value={stats.in_prompt_count} suffix={t("stats.agentsUnit", { count: stats.in_prompt_count })} />
+        <Stat label={t("stats.pullFreq")} value={formatRate(stats.pull_rate)} hint={t("stats.pullFreqHint")} />
+        <Stat
+          label={t("stats.acceptRate")}
+          value={formatRate(stats.accept_rate)}
+          hint={t("stats.acceptRateHint")}
+          color={acceptRateColor(stats.accept_rate)}
+        />
         <Stat label={t("stats.versions")} value={stats.version_count} />
       </div>
 
@@ -42,14 +51,28 @@ export function StatsTab({ skillId }: { skillId: string }) {
   );
 }
 
-function Stat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+function Stat({
+  label,
+  value,
+  suffix,
+  hint,
+  color,
+}: {
+  label: string;
+  value: number | string;
+  suffix?: string;
+  /** What the number means, under it. */
+  hint?: string;
+  color?: string;
+}) {
   return (
-    <div style={s.stat}>
+    <div style={s.stat} data-testid={`stat-${label}`}>
       <div style={s.statLabel}>{label}</div>
-      <div className="tnum" style={s.statValue}>
+      <div className="tnum" style={{ ...s.statValue, ...(color ? { color } : {}) }}>
         {value}
         {suffix && <span style={s.statSuffix}> {suffix}</span>}
       </div>
+      {hint && <div style={s.statHint}>{hint}</div>}
     </div>
   );
 }

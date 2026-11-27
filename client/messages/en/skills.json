@@ -63,7 +63,17 @@
     "toggle": "Enable {name} for every agent that links it",
     "untrusted": "untrusted",
     "disabled": "disabled",
-    "toggleFailed": "Could not switch “{name}”: {message}"
+    "toggleFailed": "Could not switch “{name}”: {message}",
+    "sourceVersion": "{source} · v{version}",
+    "agents": "{count, plural, one {# agent} other {# agents}}",
+    "agentsTitle": "Agents that link this skill (any link state)",
+    "pullFreq": "{value} pull freq",
+    "pullTitle": "Share of this workspace's review runs whose trace sent this skill",
+    "acceptRate": "{value} accept",
+    "acceptTitle": "Accepted out of accepted + dismissed findings of the runs that sent this skill",
+    "delete": "Delete skill {name}",
+    "deleteTitle": "Delete skill",
+    "deleteConfirm": "Delete skill \"{name}\"? This cannot be undone."
   },
   "skill": {
     "tabs": {
@@ -120,6 +130,10 @@
   "stats": {
     "usedBy": "Used by",
     "inPrompt": "In prompt",
+    "pullFreq": "Pull frequency",
+    "pullFreqHint": "of this workspace's review runs sent it",
+    "acceptRate": "Accept rate",
+    "acceptRateHint": "of the decided findings of those runs were accepted",
     "versions": "Versions",
     "agentsUnit": "{count, plural, one {agent} other {agents}}",
     "agentsTitle": "Agents using this skill",

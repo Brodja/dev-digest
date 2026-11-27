@@ -30,8 +30,8 @@ Homework L02, 2026-11-27. Spans client + server; this file is the spec, `server/
    edits survive a tab switch.
 4. **Versions** come from `skill_versions` (body only — no migration, no version note). Restore copies an old body into a
    new version; name, description and type are not versioned (unchanged from 002).
-5. **Stats** = the agents that link the skill and the version count. No pull frequency, accept rate or findings: there
-   is no honest data source for them.
+5. **Stats** = the agents that link the skill and the version count; pull frequency and accept rate were added later
+   from the run traces (decision 14). No findings-by-category chart.
 6. **Agent Skills tab** lists every workspace skill: linked ones first in prompt order, then the rest by name. The
    checkbox links / unlinks (as in `full-build`); the per-link switch and × go. The link's `enabled` stays in the API.
    A legacy link with `enabled = false` shows unchecked (it never reaches the prompt) and is dropped by the next save
@@ -47,6 +47,16 @@ Homework L02, 2026-11-27. Spans client + server; this file is the spec, `server/
 11. **`CodeEditor`** (line numbers, `<name>.md` header, *unsaved*, token estimate) joins `@devdigest/ui`; `SkillForm`
     uses it for the body.
 12. After *Create skill* on the Conventions page the user stays there (toast with the name) — handy for P3.
+13. **Skill card** (added 2026-11-27, after the design's SkillCard and the reference build's SkillListItem): a delete
+    button next to the switch (confirm "Delete skill "<name>"? This cannot be undone.", the card does not open,
+    a spinner while it runs; deleting the open skill goes back to `/skills`), "<Source> · v<version>" under the
+    description, and the usage row "N agents · X% pull freq · Y% accept" (accept green from 60%, amber below).
+14. **Card and Stats numbers are honest, no migration:** *N agents* = agents of the workspace that link the skill, any
+    link state; *pull freq* = runs of the workspace with a trace whose `config.skills` holds the skill / all runs with
+    a trace; *accept* = accepted / (accepted + dismissed) findings of those runs (via `reviews.run_id`). No runs or no
+    decided findings → "—" (null), never a made-up 0%. `GET /skills` returns them per item (`SkillListItem`:
+    `used_by_count`, `pull_rate`, `accept_rate`) from one aggregate query; `GET /skills/:id/stats` adds the same two
+    rates, shown as PULL FREQUENCY and ACCEPT RATE.
 
 ## Server
 

@@ -1,7 +1,8 @@
 /* SkillsSidebar — the left column of the Skills Lab (screen_skills.jsx):
    "Skills", Add Skill ▾ (Create from scratch / Import from file), search and
    the skill cards. A card opens /skills/:id (keeping the current tab); a new or
-   imported skill opens its page. Shown on /skills and /skills/:id. */
+   imported skill opens its page. A card's delete button removes the skill
+   (deleting the open one goes back to /skills). Shown on /skills and /skills/:id. */
 "use client";
 
 import React from "react";
@@ -9,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
-import { useSkills, useUpdateSkill } from "@/lib/hooks/skills";
+import { useDeleteSkill, useSkills, useUpdateSkill } from "@/lib/hooks/skills";
 import { filterSkills } from "@/lib/skill-search";
 import { useToast } from "@/lib/toast";
 import { SkillCard } from "../SkillCard";
@@ -23,6 +24,7 @@ export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab?: stri
   const toast = useToast();
   const { data: skills, isLoading, isError, refetch } = useSkills();
   const update = useUpdateSkill();
+  const del = useDeleteSkill();
   const [search, setSearch] = React.useState("");
   const [creating, setCreating] = React.useState(false);
   const [importing, setImporting] = React.useState(false);
@@ -36,6 +38,15 @@ export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab?: stri
           toast.error(t("card.toggleFailed", { name: skill.name, message: (err as Error).message })),
       },
     );
+
+  const remove = (skill: Skill) =>
+    del.mutate(skill.id, {
+      onSuccess: () => {
+        toast.success(t("config.deleted", { name: skill.name }));
+        if (skill.id === activeId) router.push("/skills");
+      },
+      onError: (err) => toast.error(t("config.deleteFailed", { name: skill.name, message: (err as Error).message })),
+    });
 
   const all = skills ?? [];
   const list = filterSkills(all, search);
@@ -95,8 +106,10 @@ export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab?: stri
             key={sk.id}
             skill={sk}
             active={sk.id === activeId}
+            deleting={del.isPending && del.variables === sk.id}
             onOpen={() => open(sk.id)}
             onToggle={(enabled) => toggle(sk, enabled)}
+            onDelete={() => remove(sk)}
           />
         ))}
       </div>

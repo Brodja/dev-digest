@@ -5,7 +5,7 @@ export const s = {
   wrap: { maxWidth: 760 } satisfies CSSProperties,
   cards: { display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" } satisfies CSSProperties,
   stat: {
-    flex: "1 1 160px",
+    flex: "1 1 130px",
     padding: 15,
     borderRadius: 9,
     border: "1px solid var(--border)",
@@ -20,6 +20,7 @@ export const s = {
   } satisfies CSSProperties,
   statValue: { marginTop: 10, fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em" } satisfies CSSProperties,
   statSuffix: { fontSize: 15, fontWeight: 500, color: "var(--text-muted)" } satisfies CSSProperties,
+  statHint: { fontSize: 11, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.35 } satisfies CSSProperties,
   panel: {
     padding: 16,
     borderRadius: 8,

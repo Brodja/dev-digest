@@ -28,6 +28,8 @@ describe("StatsTab", () => {
       version_count: 2,
       used_by_count: 2,
       in_prompt_count: 1,
+      pull_rate: 0.25,
+      accept_rate: 0.5,
       agents: [
         { agent_id: "a1", agent_name: "Alpha", agent_enabled: true, link_enabled: true, position: 2, in_prompt: true },
         { agent_id: "a2", agent_name: "Beta", agent_enabled: false, link_enabled: false, position: 1, in_prompt: false },
@@ -37,6 +39,8 @@ describe("StatsTab", () => {
     expect(screen.getByText("Used by").parentElement).toHaveTextContent("2 agents");
     expect(screen.getByText("In prompt").parentElement).toHaveTextContent("1 agent");
     expect(screen.getByText("Versions").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Pull frequency").parentElement).toHaveTextContent("25%");
+    expect(screen.getByText("50%")).toHaveStyle({ color: "var(--warn)" });
 
     const alpha = within(screen.getByTestId("usage-a1"));
     expect(alpha.getByText("#2")).toBeInTheDocument();
@@ -57,14 +61,28 @@ describe("StatsTab", () => {
       version_count: 1,
       used_by_count: 1,
       in_prompt_count: 0,
+      pull_rate: 0,
+      accept_rate: null,
       agents: [{ agent_id: "a1", agent_name: "Alpha", agent_enabled: true, link_enabled: true, position: 1, in_prompt: false }],
     };
     renderTab();
     expect(within(screen.getByTestId("usage-a1")).getByText("skill disabled")).toBeInTheDocument();
+    // Runs exist but none sent it: a real 0%; no decided findings: a dash.
+    expect(screen.getByText("Pull frequency").parentElement).toHaveTextContent("0%");
+    expect(screen.getByText("Accept rate").parentElement).toHaveTextContent("—");
   });
 
   it("an unused skill gets the empty state", () => {
-    stats = { skill_id: "s1", version: 1, version_count: 1, used_by_count: 0, in_prompt_count: 0, agents: [] };
+    stats = {
+      skill_id: "s1",
+      version: 1,
+      version_count: 1,
+      used_by_count: 0,
+      in_prompt_count: 0,
+      pull_rate: null,
+      accept_rate: null,
+      agents: [],
+    };
     renderTab();
     expect(screen.getByText("No agent uses this skill yet")).toBeInTheDocument();
   });
