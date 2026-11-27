@@ -334,6 +334,12 @@ export const Agent = z.object({
 });
 export type Agent = z.infer<typeof Agent>;
 
+/** GET /agents — an agent plus how many skills it links (agent_skills rows, any link state). */
+export const AgentListItem = Agent.extend({
+  skill_count: z.number().int(),
+});
+export type AgentListItem = z.infer<typeof AgentListItem>;
+
 export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),

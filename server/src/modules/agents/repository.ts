@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -70,6 +70,19 @@ export class AgentsRepository {
 
   async list(workspaceId: string): Promise<AgentRow[]> {
     return this.db.select().from(t.agents).where(eq(t.agents.workspaceId, workspaceId));
+  }
+
+  /**
+   * The workspace's agents with the number of skills each links (agent_skills
+   * rows, any link state) — one query: LEFT JOIN + GROUP BY the agent's key.
+   */
+  async listWithSkillCounts(workspaceId: string): Promise<{ agent: AgentRow; skillCount: number }[]> {
+    return this.db
+      .select({ agent: t.agents, skillCount: sql<number>`count(${t.agentSkills.skillId})::int` })
+      .from(t.agents)
+      .leftJoin(t.agentSkills, eq(t.agentSkills.agentId, t.agents.id))
+      .where(eq(t.agents.workspaceId, workspaceId))
+      .groupBy(t.agents.id);
   }
 
   async listEnabled(workspaceId: string): Promise<AgentRow[]> {
