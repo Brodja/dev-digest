@@ -1,18 +1,49 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { SkillSource, SkillType } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { SkillRow } from '../../db/rows.js';
+import type { SkillRow, SkillVersionRow } from '../../db/rows.js';
 import { INITIAL_SKILL_VERSION, SKILL_NAME_UNIQUE_INDEX } from './constants.js';
 import { skillNameTakenError } from './helpers.js';
 
 /**
  * Skills data-access. Owns `skills` + `skill_versions`; workspace-scoped
  * throughout. The agent side of `agent_skills` (link / order / enable) lives in
- * the agents repository; here it is only read for `usedBy`.
+ * the agents repository; here it is only read (`usedBy`, `usage`).
  */
 
-export type { SkillRow };
+export type { SkillRow, SkillVersionRow };
+
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+/** One agent that links a skill, with the link's place in that agent's order. */
+export interface SkillUsageRow {
+  agentId: string;
+  agentName: string;
+  agentEnabled: boolean;
+  linkEnabled: boolean;
+  /** 1-based rank among the agent's links by link order. */
+  position: number;
+}
+
+/** Raw usage counts of one skill across its workspace (rates are computed in helpers). */
+export interface SkillUsageTotals {
+  skillId: string;
+  /** Agents of the workspace that link the skill, any link state. */
+  usedBy: number;
+  /** Review runs with a trace whose config.skills holds the skill. */
+  runs: number;
+  /** All review runs of the workspace that have a trace. */
+  totalRuns: number;
+  /** Findings of those `runs`, accepted / dismissed (mutually exclusive). */
+  accepted: number;
+  dismissed: number;
+}
+
+export type RestoreResult =
+  | { status: 'skill_not_found' }
+  | { status: 'version_not_found' }
+  | { status: 'restored'; row: SkillRow };
 
 export interface InsertSkill {
   workspaceId: string;
@@ -114,44 +145,188 @@ export class SkillsRepository {
   async update(workspaceId: string, id: string, patch: UpdateSkill): Promise<SkillRow | undefined> {
     try {
       return await this.db.transaction(async (tx) => {
-        const [existing] = await tx
-          .select()
-          .from(t.skills)
-          .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
-          .for('update');
+        const existing = await this.lockSkill(tx, workspaceId, id);
         if (!existing) return undefined;
-
-        const bodyChanged = patch.body !== undefined && patch.body !== existing.body;
-        const nextVersion = bodyChanged ? existing.version + 1 : existing.version;
-
-        const changes = {
-          ...(patch.name !== undefined ? { name: patch.name } : {}),
-          ...(patch.description !== undefined ? { description: patch.description } : {}),
-          ...(patch.type !== undefined ? { type: patch.type } : {}),
-          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-          ...(bodyChanged ? { body: patch.body, version: nextVersion } : {}),
-        };
-        // Nothing to write (empty patch, or the same body resent): drizzle
-        // rejects an empty SET, and there is no new version to record.
-        if (Object.keys(changes).length === 0) return existing;
-
-        const [row] = await tx
-          .update(t.skills)
-          .set(changes)
-          .where(eq(t.skills.id, id))
-          .returning();
-
-        if (bodyChanged) {
-          await tx
-            .insert(t.skillVersions)
-            .values({ skillId: id, version: nextVersion, body: patch.body! });
-        }
-        return row;
+        return this.applyPatch(tx, existing, patch);
       });
     } catch (err) {
       if (isNameConflict(err) && patch.name !== undefined) throw skillNameTakenError(patch.name);
       throw err;
     }
+  }
+
+  /**
+   * Restore an old body: it becomes the next version, through the same path as
+   * an edit (row locked, version bump + snapshot in one transaction). The same
+   * body as now changes nothing and adds no version.
+   */
+  async restoreVersion(workspaceId: string, id: string, version: number): Promise<RestoreResult> {
+    return this.db.transaction(async (tx) => {
+      const existing = await this.lockSkill(tx, workspaceId, id);
+      if (!existing) return { status: 'skill_not_found' } as const;
+      const [snapshot] = await tx
+        .select({ body: t.skillVersions.body })
+        .from(t.skillVersions)
+        .where(and(eq(t.skillVersions.skillId, id), eq(t.skillVersions.version, version)));
+      if (!snapshot) return { status: 'version_not_found' } as const;
+      const row = await this.applyPatch(tx, existing, { body: snapshot.body });
+      return { status: 'restored', row } as const;
+    });
+  }
+
+  /** Body snapshots of a skill, newest first. */
+  async listVersions(skillId: string): Promise<SkillVersionRow[]> {
+    return this.db
+      .select()
+      .from(t.skillVersions)
+      .where(eq(t.skillVersions.skillId, skillId))
+      .orderBy(desc(t.skillVersions.version));
+  }
+
+  async countVersions(skillId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(t.skillVersions)
+      .where(eq(t.skillVersions.skillId, skillId));
+    return Number(row?.n ?? 0);
+  }
+
+  /**
+   * The agents of the workspace that link this skill (any link state), by agent
+   * name, each with the skill's place in that agent's link order.
+   */
+  async usage(workspaceId: string, skillId: string): Promise<SkillUsageRow[]> {
+    const linkingAgents = this.db
+      .select({ id: t.agentSkills.agentId })
+      .from(t.agentSkills)
+      .where(eq(t.agentSkills.skillId, skillId));
+    const ranked = this.db
+      .select({
+        agentId: t.agentSkills.agentId,
+        skillId: t.agentSkills.skillId,
+        enabled: t.agentSkills.enabled,
+        position:
+          sql<number>`(row_number() over (partition by ${t.agentSkills.agentId} order by ${t.agentSkills.order}, ${t.agentSkills.skillId}))::int`.as(
+            'position',
+          ),
+      })
+      .from(t.agentSkills)
+      .where(inArray(t.agentSkills.agentId, linkingAgents))
+      .as('ranked');
+    return this.db
+      .select({
+        agentId: t.agents.id,
+        agentName: t.agents.name,
+        agentEnabled: t.agents.enabled,
+        linkEnabled: ranked.enabled,
+        position: ranked.position,
+      })
+      .from(ranked)
+      .innerJoin(t.agents, eq(ranked.agentId, t.agents.id))
+      .where(and(eq(ranked.skillId, skillId), eq(t.agents.workspaceId, workspaceId)))
+      .orderBy(asc(t.agents.name));
+  }
+
+  /**
+   * Usage counts of every skill of the workspace (or of one), in ONE query: links
+   * from agent_skills, runs from run_traces (trace → config.skills[].id, the
+   * skills a run really sent), findings of those runs via reviews.run_id.
+   * Everything is scoped to the workspace; skills without runs or links get 0s.
+   */
+  async usageTotals(workspaceId: string, skillId?: string): Promise<SkillUsageTotals[]> {
+    const rows = await this.db.execute(sql`
+      WITH ws_runs AS (
+        SELECT ar.id AS run_id,
+               CASE WHEN jsonb_typeof(rt.trace -> 'config' -> 'skills') = 'array'
+                    THEN rt.trace -> 'config' -> 'skills' ELSE '[]'::jsonb END AS skills
+        FROM agent_runs ar
+        JOIN run_traces rt ON rt.run_id = ar.id
+        WHERE ar.workspace_id = ${workspaceId}
+      ),
+      run_skills AS (
+        SELECT DISTINCT r.run_id, s.elem ->> 'id' AS skill_id
+        FROM ws_runs r CROSS JOIN LATERAL jsonb_array_elements(r.skills) AS s(elem)
+      ),
+      run_findings AS (
+        SELECT rv.run_id,
+               count(*) FILTER (WHERE f.accepted_at IS NOT NULL) AS accepted,
+               count(*) FILTER (WHERE f.dismissed_at IS NOT NULL) AS dismissed
+        FROM reviews rv
+        JOIN findings f ON f.review_id = rv.id
+        WHERE rv.workspace_id = ${workspaceId} AND rv.run_id IS NOT NULL
+        GROUP BY rv.run_id
+      ),
+      skill_runs AS (
+        SELECT rs.skill_id,
+               count(*) AS runs,
+               coalesce(sum(rf.accepted), 0) AS accepted,
+               coalesce(sum(rf.dismissed), 0) AS dismissed
+        FROM run_skills rs
+        LEFT JOIN run_findings rf ON rf.run_id = rs.run_id
+        GROUP BY rs.skill_id
+      ),
+      links AS (
+        SELECT l.skill_id, count(*) AS used_by
+        FROM agent_skills l
+        JOIN agents a ON a.id = l.agent_id
+        WHERE a.workspace_id = ${workspaceId}
+        GROUP BY l.skill_id
+      )
+      SELECT s.id AS "skillId",
+             coalesce(l.used_by, 0)::int AS "usedBy",
+             coalesce(sr.runs, 0)::int AS "runs",
+             (SELECT count(*) FROM ws_runs)::int AS "totalRuns",
+             coalesce(sr.accepted, 0)::int AS "accepted",
+             coalesce(sr.dismissed, 0)::int AS "dismissed"
+      FROM skills s
+      LEFT JOIN links l ON l.skill_id = s.id
+      LEFT JOIN skill_runs sr ON sr.skill_id = s.id::text
+      WHERE s.workspace_id = ${workspaceId}
+        ${skillId ? sql`AND s.id = ${skillId}` : sql``}
+    `);
+    return rows as unknown as SkillUsageTotals[];
+  }
+
+  private async lockSkill(tx: Tx, workspaceId: string, id: string): Promise<SkillRow | undefined> {
+    const [row] = await tx
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
+      .for('update');
+    return row;
+  }
+
+  /**
+   * Apply a patch to a locked row. A changed body bumps `version` and snapshots
+   * the new body into skill_versions; metadata / enabled changes don't.
+   */
+  private async applyPatch(tx: Tx, existing: SkillRow, patch: UpdateSkill): Promise<SkillRow> {
+    const bodyChanged = patch.body !== undefined && patch.body !== existing.body;
+    const nextVersion = bodyChanged ? existing.version + 1 : existing.version;
+
+    const changes = {
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.type !== undefined ? { type: patch.type } : {}),
+      ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      ...(bodyChanged ? { body: patch.body, version: nextVersion } : {}),
+    };
+    // Nothing to write (empty patch, or the same body resent): drizzle
+    // rejects an empty SET, and there is no new version to record.
+    if (Object.keys(changes).length === 0) return existing;
+
+    const [row] = await tx
+      .update(t.skills)
+      .set(changes)
+      .where(eq(t.skills.id, existing.id))
+      .returning();
+
+    if (bodyChanged) {
+      await tx
+        .insert(t.skillVersions)
+        .values({ skillId: existing.id, version: nextVersion, body: patch.body! });
+    }
+    return row!;
   }
 
   /** Delete (scoped to workspace). Links + versions go by cascade. */

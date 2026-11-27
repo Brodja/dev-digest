@@ -198,4 +198,43 @@ d('agent skill links (Testcontainers pg)', () => {
     expect(latest.config.skills).toEqual([s3!.id, s2!.id]);
     await app.close();
   });
+
+  it('GET /agents carries skill_count (links in any state), per workspace (client/specs/004)', async () => {
+    const app = await makeApp();
+    const db = pg.handle.db;
+    const withSkills = await newAgent(app);
+    const without = await newAgent(app);
+    const [s1, s2] = [await newSkill(app), await newSkill(app)];
+    expect(
+      (await put(app, withSkills.id, [
+        { skill_id: s1.id, enabled: true },
+        { skill_id: s2.id, enabled: false },
+      ])).statusCode,
+    ).toBe(200);
+
+    // Another workspace: its agent links our skill straight in the DB — not listed, counts nothing here.
+    const [otherWs] = await db.insert(t.workspaces).values({ name: 'agents-count-other-ws' }).returning();
+    const [otherAgent] = await db
+      .insert(t.agents)
+      .values({ workspaceId: otherWs!.id, name: 'Other agent', provider: 'openai', model: 'gpt-4.1', systemPrompt: 'x' })
+      .returning();
+    await db.insert(t.agentSkills).values({ agentId: otherAgent!.id, skillId: s1.id, order: 0 });
+
+    const res = await app.inject({ method: 'GET', url: '/agents' });
+    expect(res.statusCode).toBe(200);
+    const list = res.json() as { id: string; name: string; skill_count: number }[];
+    const byId = new Map(list.map((a) => [a.id, a]));
+    expect(byId.get(withSkills.id)).toMatchObject({ skill_count: 2 });
+    expect(byId.get(without.id)).toMatchObject({ skill_count: 0 });
+    expect(byId.has(otherAgent!.id)).toBe(false);
+    // Every agent of the workspace is listed once, the seeded ones with a count too.
+    expect(new Set(list.map((a) => a.id)).size).toBe(list.length);
+    expect(list.every((a) => Number.isInteger(a.skill_count))).toBe(true);
+
+    // Unlinking updates the count.
+    await put(app, withSkills.id, [{ skill_id: s2.id, enabled: true }]);
+    const after = (await app.inject({ method: 'GET', url: '/agents' })).json() as { id: string; skill_count: number }[];
+    expect(after.find((a) => a.id === withSkills.id)).toMatchObject({ skill_count: 1 });
+    await app.close();
+  });
 });

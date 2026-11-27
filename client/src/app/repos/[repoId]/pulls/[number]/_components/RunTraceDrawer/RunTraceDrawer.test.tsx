@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunTrace } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/runs.json"; // apps/web/messages/en/runs.json
@@ -75,6 +75,32 @@ describe("Run Trace drawer — COST stat", () => {
   it("a trace stored before the feature (no cost_usd) shows '—'", () => {
     renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
     expect(screen.getByTestId("run-cost")).toHaveTextContent("—");
+  });
+});
+
+describe("Run Trace drawer — Skills loaded in Configuration", () => {
+  const skillsLoadedRow = () => screen.getByText("Skills loaded").parentElement!;
+
+  it("lists the skills sent with the run as mono chips, in prompt order, with their version", () => {
+    currentTrace = {
+      ...TRACE,
+      config: {
+        ...TRACE.config,
+        skills: [
+          { id: "s2", name: "owasp-top10", version: 1, trusted: false, tokens: 40 },
+          { id: "s1", name: "repo-conventions", version: 3, trusted: true, tokens: 52 },
+        ],
+      },
+    };
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    const row = skillsLoadedRow();
+    expect(row).toHaveTextContent("owasp-top10repo-conventions");
+    expect(within(row).getByText("repo-conventions").closest("[title]")).toHaveAttribute("title", "v3");
+  });
+
+  it("says none for a run without skills (or a trace stored before them)", () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    expect(skillsLoadedRow()).toHaveTextContent("none");
   });
 });
 

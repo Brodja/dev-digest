@@ -78,6 +78,16 @@ describe("useSetAgentSkills", () => {
     expect(qc.getQueryData(KEY)).toEqual(saved);
   });
 
+  it("refreshes the agents list after a save, so the cards' skill count follows", async () => {
+    put.mockResolvedValue(OPTIMISTIC);
+    const { qc, result } = setup();
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    await act(async () => {
+      await result.current.mutateAsync({ agentId: "ag1", links: NEXT });
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["agents"] });
+  });
+
   it("opts out of the global error toast (the Skills tab shows its own)", () => {
     const { qc, result } = setup();
     put.mockReturnValue(new Promise(() => {}));

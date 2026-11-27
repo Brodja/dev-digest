@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { AgentSkillLink, Skill } from "@devdigest/shared";
-import { linkedRows, moveItem, toLinkInputs } from "./helpers";
+import { moveItem, splitRows, toggleLink, toLinkInputs } from "./helpers";
 
-const skill = (id: string): Skill => ({
+const skill = (id: string, name = `skill-${id}`): Skill => ({
   id,
-  name: `skill-${id}`,
+  name,
   description: "d",
   type: "custom",
   source: "manual",
@@ -31,21 +31,31 @@ describe("moveItem", () => {
   });
 });
 
-describe("linkedRows", () => {
-  it("sorts links by order, joins the skill and skips unknown ids", () => {
+describe("splitRows", () => {
+  it("puts the enabled links first by order, then every other skill by name; unknown ids are skipped", () => {
     const links: AgentSkillLink[] = [
       { agent_id: "ag", skill_id: "b", order: 1, enabled: false },
       { agent_id: "ag", skill_id: "gone", order: 2, enabled: true },
+      { agent_id: "ag", skill_id: "c", order: 3, enabled: true },
       { agent_id: "ag", skill_id: "a", order: 0, enabled: true },
     ];
-    const rows = linkedRows(links, [skill("a"), skill("b")]);
-    expect(rows.map((r) => [r.skill.id, r.enabled])).toEqual([
-      ["a", true],
-      ["b", false],
-    ]);
-    expect(toLinkInputs(rows)).toEqual([
+    const { linked, rest } = splitRows(links, [skill("a"), skill("b", "zeta"), skill("c"), skill("d", "alpha")]);
+    expect(linked.map((sk) => sk.id)).toEqual(["a", "c"]);
+    // b's link is off: it is with the rest, unchecked.
+    expect(rest.map((sk) => sk.name)).toEqual(["alpha", "zeta"]);
+  });
+});
+
+describe("toggleLink / toLinkInputs", () => {
+  it("appends a newly checked skill and drops an unchecked one", () => {
+    expect(toggleLink(["a", "b"], "c")).toEqual(["a", "b", "c"]);
+    expect(toggleLink(["a", "b"], "a")).toEqual(["b"]);
+  });
+
+  it("sends every linked skill enabled, in order", () => {
+    expect(toLinkInputs(["b", "a"])).toEqual([
+      { skill_id: "b", enabled: true },
       { skill_id: "a", enabled: true },
-      { skill_id: "b", enabled: false },
     ]);
   });
 });

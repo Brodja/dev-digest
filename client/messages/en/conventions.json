@@ -15,12 +15,55 @@
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
       "cta": "Run extraction"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files",
+    "scanSummary": "{files, plural, one {# sampled file} other {# sampled files}} · last scan {when}",
+    "droppedSummary": "{count, plural, one {# proposal dropped} other {# proposals dropped}} without evidence",
+    "acceptedCount": "{count} of {total} accepted",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "bulkFailed": "Could not update {failed} of {total} conventions — try again.",
+    "scanningRepo": "Scanning repository…",
+    "listLabel": "Convention candidates",
+    "nothingGrounded": "The last scan found no convention it could back with evidence from the code. Re-scan to try again.",
+    "errors": {
+      "repo_not_indexed": "This repository has no index to sample files from yet. Resync it, then run the extraction again.",
+      "repo_intel_disabled": "Repo intelligence is turned off on the server (REPO_INTEL_ENABLED=false), so there are no files to sample.",
+      "repo_not_cloned": "This repository has not been cloned yet.",
+      "repo_changed": "The checkout changed while files were being read. Run the extraction again.",
+      "extraction_running": "An extraction of this repository is already running.",
+      "llm_bad_output": "The model returned unusable rules this time. Run the extraction again."
+    }
   },
   "card": {
     "confidence": "Confidence",
     "accepted": "Accepted",
     "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "acceptAsSkill": "Accept as Skill",
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "undoAccepted": "Accepted — click to move back to review",
+    "undoRejected": "Rejected — click to move back to review",
+    "edit": "Edit rule",
+    "editHint": "Click to edit the rule",
+    "editLabel": "Rule text",
+    "save": "Save",
+    "cancel": "Cancel",
+    "evidenceLink": "Open {file} on GitHub at these lines",
+    "copy": "Copy snippet",
+    "copied": "Snippet copied",
+    "copyFailed": "Could not copy the snippet."
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "merged": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "bodyHint": "The only text sent to the model: the accepted rules with their file:line references. Code from the repository stays out on purpose — this skill is trusted, so code in it would reach the prompt without the untrusted wrapper.",
+    "savedAs": "Saved as v1 · added to Skills Lab",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "created": "Skill “{name}” created — link it to an agent in the agent’s Skills tab.",
+    "failed": "Could not create the skill.",
+    "notAccepted": "Some of these conventions are no longer accepted. Close the dialog and try again."
   }
 }

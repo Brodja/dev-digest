@@ -4,7 +4,7 @@ import {
   FeatureModelChoice,
   type FeatureModelId,
 } from '@devdigest/shared';
-import type { Container } from '../../platform/container.js';
+import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { rowsToSettings } from './helpers.js';
 
@@ -17,6 +17,15 @@ import { rowsToSettings } from './helpers.js';
  * registry default in `FEATURE_MODELS` — which mirrors each module's old
  * constant, so behaviour is unchanged until a model is explicitly picked.
  */
+
+/**
+ * Structural on purpose: callers pass the Container (it has `db`), and this file
+ * never imports `Container`, so the composition root can expose
+ * `container.featureModel()` without a dependency cycle.
+ */
+export interface FeatureModelDeps {
+  readonly db: Db;
+}
 
 const DEFAULTS = Object.fromEntries(
   FEATURE_MODELS.map((f) => [f.id, { provider: f.defaultProvider, model: f.defaultModel }]),
@@ -34,11 +43,11 @@ export function defaultFeatureModel(id: FeatureModelId): FeatureModelChoice {
  * `resolveFeatureModel` instead.
  */
 export async function getFeatureModelOverride(
-  container: Container,
+  deps: FeatureModelDeps,
   workspaceId: string,
   id: FeatureModelId,
 ): Promise<FeatureModelChoice | undefined> {
-  const rows = await container.db
+  const rows = await deps.db
     .select({ key: t.settings.key, value: t.settings.value })
     .from(t.settings)
     .where(eq(t.settings.workspaceId, workspaceId));
@@ -49,9 +58,9 @@ export async function getFeatureModelOverride(
 
 /** Resolve `id` to a concrete provider+model: workspace override, else registry default. */
 export async function resolveFeatureModel(
-  container: Container,
+  deps: FeatureModelDeps,
   workspaceId: string,
   id: FeatureModelId,
 ): Promise<FeatureModelChoice> {
-  return (await getFeatureModelOverride(container, workspaceId, id)) ?? DEFAULTS[id];
+  return (await getFeatureModelOverride(deps, workspaceId, id)) ?? DEFAULTS[id];
 }

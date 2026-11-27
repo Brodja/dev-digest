@@ -1,14 +1,9 @@
-/** Constants of the /skills page (server/specs/002-skills.md). */
+/** Constants of the Skills Lab pages (server/specs/002-skills.md, client/specs/004). */
 import type { IconName } from "@devdigest/ui";
-import type { SkillSource, SkillType } from "@devdigest/shared";
+import type { SkillSource } from "@devdigest/shared";
 
-/** Copied from the SkillType enum: the client imports shared contracts as types only. */
-export const SKILL_TYPES = ["rubric", "convention", "security", "custom"] as const satisfies readonly SkillType[];
-
-/** Same rules as the server (modules/skills/constants.ts). */
-export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-export const SKILL_DESCRIPTION_MAX = 1024;
-export const SKILL_BODY_MAX = 40_000;
+// Skill field rules (types, name pattern, limits) live in @/lib/skill-fields:
+// the Conventions page builds skills with the same form.
 
 export const SOURCE_ICONS: Record<SkillSource, IconName> = {
   manual: "Edit",
@@ -22,5 +17,5 @@ export const SOURCE_ICONS: Record<SkillSource, IconName> = {
 export const IMPORT_MAX_FILE_BYTES = 1_048_576;
 export const IMPORT_ACCEPT = ".md,.markdown,.zip,.skill";
 
-/** Card grid (responsive auto-fill), same as the agents list. */
-export const CARD_GRID_COLS = "repeat(auto-fill, minmax(280px, 1fr))";
+/** Accept rate shown green from here, amber below (screen_skills.jsx SkillCard). */
+export const ACCEPT_RATE_GOOD = 0.6;

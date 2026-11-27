@@ -1,7 +1,25 @@
-import type { Skill, SkillDetail, SkillImportPreview, SkillSource, SkillType } from '@devdigest/shared';
-import type { Container } from '../../platform/container.js';
+import type {
+  ArchiveReader,
+  Skill,
+  SkillDetail,
+  SkillImportPreview,
+  SkillListItem,
+  SkillSource,
+  SkillStats,
+  SkillType,
+  SkillVersion,
+} from '@devdigest/shared';
+import type { Db } from '../../db/client.js';
+import { NotFoundError } from '../../platform/errors.js';
 import { SkillsRepository } from './repository.js';
-import { skillNameTakenError, toSkillDetailDto, toSkillDto } from './helpers.js';
+import {
+  skillNameTakenError,
+  toSkillDetailDto,
+  toSkillDto,
+  toSkillListItemDto,
+  toSkillStatsDto,
+  toSkillVersionDto,
+} from './helpers.js';
 import {
   IMPORT_MAX_BASE64_CHARS,
   IMPORT_MAX_ENTRIES,
@@ -40,16 +58,29 @@ export interface SkillUpload {
   content_base64: string;
 }
 
+/**
+ * What the service needs. Structural on purpose: the composition root passes
+ * itself (`container.skills`), and this file never imports `Container`, so the
+ * container can build the service without a dependency cycle. `archive` is read
+ * at call time, so a test override on the container still applies.
+ */
+export interface SkillsDeps {
+  readonly db: Db;
+  readonly archive: ArchiveReader;
+}
+
 export class SkillsService {
   private repo: SkillsRepository;
 
-  constructor(private container: Container) {
-    this.repo = new SkillsRepository(container.db);
+  constructor(private deps: SkillsDeps) {
+    this.repo = new SkillsRepository(deps.db);
   }
 
-  async list(workspaceId: string): Promise<Skill[]> {
-    const rows = await this.repo.list(workspaceId);
-    return rows.map(toSkillDto);
+  /** Every skill with its usage (agents, pull rate, accept rate): two queries in all, no N+1. */
+  async list(workspaceId: string): Promise<SkillListItem[]> {
+    const [rows, totals] = await Promise.all([this.repo.list(workspaceId), this.repo.usageTotals(workspaceId)]);
+    const bySkill = new Map(totals.map((u) => [u.skillId, u]));
+    return rows.map((row) => toSkillListItemDto(row, bySkill.get(row.id)));
   }
 
   async get(workspaceId: string, id: string): Promise<SkillDetail | undefined> {
@@ -89,6 +120,40 @@ export class SkillsService {
     return this.repo.deleteById(workspaceId, id);
   }
 
+  /** Body history, newest first (client/specs/004-skills-lab-design.md). */
+  async listVersions(workspaceId: string, id: string): Promise<SkillVersion[]> {
+    await this.requireSkill(workspaceId, id);
+    const rows = await this.repo.listVersions(id);
+    return rows.map(toSkillVersionDto);
+  }
+
+  /** Bring an old body back as the next version (same body as now → unchanged). */
+  async restore(workspaceId: string, id: string, version: number): Promise<Skill> {
+    const result = await this.repo.restoreVersion(workspaceId, id, version);
+    if (result.status === 'skill_not_found') throw new NotFoundError('Skill not found');
+    if (result.status === 'version_not_found') {
+      throw new NotFoundError(`Skill version ${version} not found`, { version });
+    }
+    return toSkillDto(result.row);
+  }
+
+  /** Which agents link the skill, and how many body versions it has. */
+  async stats(workspaceId: string, id: string): Promise<SkillStats> {
+    const skill = await this.requireSkill(workspaceId, id);
+    const [versionCount, usage, [totals]] = await Promise.all([
+      this.repo.countVersions(id),
+      this.repo.usage(workspaceId, id),
+      this.repo.usageTotals(workspaceId, id),
+    ]);
+    return toSkillStatsDto(skill, versionCount, usage, totals);
+  }
+
+  private async requireSkill(workspaceId: string, id: string) {
+    const row = await this.repo.getById(workspaceId, id);
+    if (!row) throw new NotFoundError('Skill not found');
+    return row;
+  }
+
   /**
    * POST /skills/import/preview — what the upload would become. Writes NOTHING
    * (no row, no file): the archive stays in memory, only its SKILL.md is
@@ -124,7 +189,7 @@ export class SkillsService {
   }
 
   private readArchive(bytes: Uint8Array): { text: string; skillPath: string; ignored: IgnoredFile[] } {
-    const archive = this.container.archive;
+    const archive = this.deps.archive;
     let entries;
     try {
       entries = archive.entries(bytes);

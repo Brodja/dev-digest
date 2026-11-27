@@ -34,6 +34,21 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
               {trace.config.provider ?? "—"}
             </span>
           </Row>
+          <Row label={t("trace.config.skillsLoaded")}>
+            <div style={s.specsWrap}>
+              {(trace.config.skills ?? []).length === 0 ? (
+                <span style={s.specsNone}>{t("trace.config.none")}</span>
+              ) : (
+                (trace.config.skills ?? []).map((sk) => (
+                  <span key={sk.id} title={t("trace.config.skillVersion", { version: sk.version })}>
+                    <Badge color="var(--text-secondary)" mono>
+                      {sk.name}
+                    </Badge>
+                  </span>
+                ))
+              )}
+            </div>
+          </Row>
           <Row label={t("trace.config.memoryPulled")}>
             <span>{t("trace.config.items", { count: trace.memory_pulled.length })}</span>
           </Row>

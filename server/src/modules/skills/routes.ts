@@ -4,34 +4,24 @@ import { z } from 'zod';
 import { SkillType } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
+import { SkillBody, SkillDescription, SkillName } from '../_shared/skill-fields.js';
 import { NotFoundError } from '../../platform/errors.js';
-import { SkillsService } from './service.js';
-import {
-  IMPORT_BODY_LIMIT_BYTES,
-  SKILL_BODY_MAX,
-  SKILL_DESCRIPTION_MAX,
-  SKILL_NAME_HINT,
-  SKILL_NAME_PATTERN,
-} from './constants.js';
+import { IMPORT_BODY_LIMIT_BYTES } from './constants.js';
 
 /**
  * Skills module (server/specs/002-skills.md).
- *   GET    /skills       → list (workspace-scoped, by name)
+ *   GET    /skills       → list (workspace-scoped, by name) + used_by_count, pull_rate, accept_rate
  *   GET    /skills/:id   → one skill + the agents that link it (used_by)
  *   POST   /skills       → create (source = manual, v1)
  *   PUT    /skills/:id   → partial update; a changed body bumps the version
  *   DELETE /skills/:id   → delete (links + versions cascade)
  *   POST   /skills/import/preview → upload (.md / .zip / .skill, base64) → draft; writes nothing
  *   POST   /skills/import → save the confirmed draft (source = imported_file, disabled)
+ *   GET    /skills/:id/versions → body history, newest first (client/specs/004)
+ *   POST   /skills/:id/restore  → { version } → that body becomes the next version
+ *   GET    /skills/:id/stats    → agents that link it + version count
  * Linking skills to an agent lives in the agents module (/agents/:id/skills).
  */
-
-const SkillName = z.string().regex(SKILL_NAME_PATTERN, SKILL_NAME_HINT);
-const SkillDescription = z.string().trim().min(1).max(SKILL_DESCRIPTION_MAX);
-const SkillBody = z
-  .string()
-  .max(SKILL_BODY_MAX)
-  .refine((s) => s.trim().length > 0, 'Body must not be blank');
 
 const CreateSkillBody = z.object({
   name: SkillName,
@@ -59,9 +49,13 @@ const UpdateSkillBody = z.object({
   enabled: z.boolean().optional(),
 });
 
+const RestoreBody = z.object({
+  version: z.number().int().positive(),
+});
+
 export default async function skillsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
-  const service = new SkillsService(app.container);
+  const service = app.container.skills;
 
   app.get('/skills', async (req) => {
     const { workspaceId } = await getContext(app.container, req);
@@ -114,5 +108,24 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     const ok = await service.delete(workspaceId, req.params.id);
     if (!ok) throw new NotFoundError('Skill not found');
     return { ok: true };
+  });
+
+  app.get('/skills/:id/versions', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.listVersions(workspaceId, req.params.id);
+  });
+
+  app.post(
+    '/skills/:id/restore',
+    { schema: { params: IdParams, body: RestoreBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      return service.restore(workspaceId, req.params.id, req.body.version);
+    },
+  );
+
+  app.get('/skills/:id/stats', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.stats(workspaceId, req.params.id);
   });
 }

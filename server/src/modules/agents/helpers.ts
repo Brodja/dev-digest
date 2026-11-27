@@ -1,4 +1,4 @@
-import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type { Agent, AgentListItem, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
 import type { AgentRow, AgentVersionRow } from './repository.js';
 
@@ -7,6 +7,11 @@ import type { AgentRow, AgentVersionRow } from './repository.js';
  * config-version-bump rule. No I/O; behaviour-identical to the previous inline
  * implementations.
  */
+
+/** GET /agents item: the agent plus how many skills it links. */
+export function toAgentListItemDto(row: AgentRow, skillCount: number): AgentListItem {
+  return { ...toAgentDto(row), skill_count: skillCount };
+}
 
 /** Map a persisted agent row to the public `Agent` DTO. */
 export function toAgentDto(row: AgentRow): Agent {

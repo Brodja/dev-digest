@@ -4,12 +4,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import { LOCAL_ERROR_TOAST } from "../mutation-meta";
-import type { Agent, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentListItem, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
+/** Every agent of the workspace with its skill count (the agent cards). */
 export function useAgents() {
   return useQuery({
     queryKey: ["agents"],
-    queryFn: () => api.get<Agent[]>("/agents"),
+    queryFn: () => api.get<AgentListItem[]>("/agents"),
   });
 }
 
@@ -124,8 +125,11 @@ export function useSetAgentSkills() {
       qc.setQueryData(["agent-skills", agentId], data);
     },
     onSettled: () => {
-      // A skill's "used by" list depends on its links.
+      // A skill's "used by" list and its stats depend on its links, and so
+      // does the skill count on the agent cards.
       qc.invalidateQueries({ queryKey: ["skill"] });
+      qc.invalidateQueries({ queryKey: ["skill-stats"] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
     },
   });
 }
